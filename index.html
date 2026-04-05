@@ -3,8 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#fafafa" />
+  <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0f0f10" media="(prefers-color-scheme: dark)" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="I miei locali" />
   <title>I miei locali</title>
+
+  <!-- Favicon & Apple touch icon: minimal crossed cutlery -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%231a1a1a'/><g stroke='%23f0ede6' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' fill='none'><path d='M22 14 L22 50'/><path d='M18 14 L18 26 Q18 30 22 30 Q26 30 26 26 L26 14'/><path d='M42 14 Q36 14 36 22 Q36 30 42 30 L42 50'/></g></svg>" />
+  <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='40' fill='%231a1a1a'/><g stroke='%23f0ede6' stroke-width='8' stroke-linecap='round' stroke-linejoin='round' fill='none'><path d='M62 40 L62 140'/><path d='M51 40 L51 74 Q51 84 62 84 Q73 84 73 74 L73 40'/><path d='M118 40 Q101 40 101 62 Q101 84 118 84 L118 140'/></g></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;0,900;1,400;1,700&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -176,15 +185,37 @@
       const [editingId, setEditingId] = useState(null);
       const [theme, setTheme] = useState(() => {
         try {
-          return localStorage.getItem("ristoranti_theme") || "light";
-        } catch (e) { return "light"; }
+          return localStorage.getItem("ristoranti_theme") || "auto";
+        } catch (e) { return "auto"; }
       });
       const fileInputRef = useRef(null);
 
+      // Resolve actual theme (auto → system preference) and apply it
       useEffect(() => {
-        document.documentElement.setAttribute("data-theme", theme);
-        const meta = document.querySelector('meta[name="theme-color"]');
-        if (meta) meta.setAttribute("content", theme === "dark" ? "#0f0f10" : "#fafafa");
+        const mql = window.matchMedia("(prefers-color-scheme: dark)");
+        const applyTheme = () => {
+          const resolved = theme === "auto" ? (mql.matches ? "dark" : "light") : theme;
+          document.documentElement.setAttribute("data-theme", resolved);
+          // Update theme-color dynamically for manual override;
+          // for "auto" we let the media-query meta tags handle it
+          if (theme !== "auto") {
+            let meta = document.querySelector('meta[name="theme-color"]:not([media])');
+            if (!meta) {
+              meta = document.createElement("meta");
+              meta.setAttribute("name", "theme-color");
+              document.head.appendChild(meta);
+            }
+            meta.setAttribute("content", resolved === "dark" ? "#0f0f10" : "#fafafa");
+          } else {
+            const extra = document.querySelector('meta[name="theme-color"]:not([media])');
+            if (extra) extra.remove();
+          }
+        };
+        applyTheme();
+        if (theme === "auto") {
+          mql.addEventListener("change", applyTheme);
+          return () => mql.removeEventListener("change", applyTheme);
+        }
         try { localStorage.setItem("ristoranti_theme", theme); } catch (e) {}
       }, [theme]);
 
@@ -484,23 +515,60 @@
                           minWidth: 180, overflow: "hidden",
                           zIndex: 30,
                         }}>
-                          <button
-                            onClick={() => { setTheme(theme === "dark" ? "light" : "dark"); setMenuOpen(false); }}
-                            style={{
-                              display: "block", width: "100%", textAlign: "left",
-                              padding: "12px 16px", border: "none", background: "transparent",
-                              fontSize: 14, color: "var(--text)", cursor: "pointer",
-                              fontFamily: "'Instrument Sans', sans-serif",
-                              borderBottom: "1px solid var(--border-soft)",
-                              WebkitTapHighlightColor: "transparent",
-                            }}
-                          >
-                            {theme === "dark" ? "☀ Tema chiaro" : "☾ Tema scuro"}
-                          </button>
+                          {[
+                            {
+                              key: "light",
+                              label: "Tema chiaro",
+                              icon: (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                  <circle cx="12" cy="12" r="4" />
+                                  <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+                                </svg>
+                              ),
+                            },
+                            {
+                              key: "dark",
+                              label: "Tema scuro",
+                              icon: (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+                                </svg>
+                              ),
+                            },
+                            {
+                              key: "auto",
+                              label: "Automatico",
+                              icon: (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                  <circle cx="12" cy="12" r="9" />
+                                  <path d="M12 3 A9 9 0 0 1 12 21 Z" fill="currentColor" stroke="none" />
+                                </svg>
+                              ),
+                            },
+                          ].map((opt) => (
+                            <button
+                              key={opt.key}
+                              onClick={() => { setTheme(opt.key); setMenuOpen(false); }}
+                              style={{
+                                display: "flex", alignItems: "center", gap: 10,
+                                width: "100%", textAlign: "left",
+                                padding: "12px 16px", border: "none",
+                                background: theme === opt.key ? "var(--pill-bg)" : "transparent",
+                                fontSize: 14, color: "var(--text)", cursor: "pointer",
+                                fontFamily: "'Instrument Sans', sans-serif",
+                                borderBottom: "1px solid var(--border-soft)",
+                                WebkitTapHighlightColor: "transparent",
+                              }}
+                            >
+                              <span style={{ display: "inline-flex", width: 14, height: 14, color: "var(--text-faint)" }}>{opt.icon}</span>
+                              {opt.label}
+                            </button>
+                          ))}
                           <button
                             onClick={handleExport}
                             style={{
-                              display: "block", width: "100%", textAlign: "left",
+                              display: "flex", alignItems: "center", gap: 10,
+                              width: "100%", textAlign: "left",
                               padding: "12px 16px", border: "none", background: "transparent",
                               fontSize: 14, color: "var(--text)", cursor: "pointer",
                               fontFamily: "'Instrument Sans', sans-serif",
@@ -508,19 +576,34 @@
                               WebkitTapHighlightColor: "transparent",
                             }}
                           >
-                            ↓ Esporta dati
+                            <span style={{ display: "inline-flex", width: 14, height: 14, color: "var(--text-faint)" }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="7 10 12 15 17 10" />
+                                <line x1="12" y1="15" x2="12" y2="3" />
+                              </svg>
+                            </span>
+                            Esporta dati
                           </button>
                           <button
                             onClick={handleImportClick}
                             style={{
-                              display: "block", width: "100%", textAlign: "left",
+                              display: "flex", alignItems: "center", gap: 10,
+                              width: "100%", textAlign: "left",
                               padding: "12px 16px", border: "none", background: "transparent",
                               fontSize: 14, color: "var(--text)", cursor: "pointer",
                               fontFamily: "'Instrument Sans', sans-serif",
                               WebkitTapHighlightColor: "transparent",
                             }}
                           >
-                            ↑ Importa dati
+                            <span style={{ display: "inline-flex", width: 14, height: 14, color: "var(--text-faint)" }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="17 8 12 3 7 8" />
+                                <line x1="12" y1="3" x2="12" y2="15" />
+                              </svg>
+                            </span>
+                            Importa dati
                           </button>
                         </div>
                       </>
