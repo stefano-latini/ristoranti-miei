@@ -7,7 +7,7 @@
   <title>I miei locali</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;0,900;1,400;1,700&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { background: #fafafa; }
@@ -30,7 +30,7 @@
   <div id="root"></div>
 
   <script type="text/babel" data-type="module">
-    const { useState, useEffect, useCallback } = React;
+    const { useState, useEffect, useCallback, useRef } = React;
 
     const CATEGORIES = [
       { key: "location", label: "Location" },
@@ -113,8 +113,13 @@
       const [search, setSearch] = useState("");
       const [sort, setSort] = useState("date");
       const [loaded, setLoaded] = useState(false);
+      const [menuOpen, setMenuOpen] = useState(false);
+      const [editingId, setEditingId] = useState(null);
+      const fileInputRef = useRef(null);
 
+      // Form state
       const [fn, setFn] = useState("");
+      const [fcomune, setFcomune] = useState("");
       const [ft, setFt] = useState(null);
       const [fr, setFr] = useState({ location: 0, menu: 0, servizio: 0, conto: 0 });
       const [fnote, setFnote] = useState("");
@@ -138,23 +143,112 @@
         return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
       };
 
-      const reset = () => { setFn(""); setFt(null); setFr({ location: 0, menu: 0, servizio: 0, conto: 0 }); setFnote(""); setErr(""); };
+      const reset = () => {
+        setFn(""); setFcomune(""); setFt(null);
+        setFr({ location: 0, menu: 0, servizio: 0, conto: 0 });
+        setFnote(""); setErr(""); setEditingId(null);
+      };
+
+      const startEdit = (r) => {
+        setEditingId(r.id);
+        setFn(r.name);
+        setFcomune(r.comune || "");
+        setFt(r.tipologia);
+        setFr({ ...r.ratings });
+        setFnote(r.note || "");
+        setErr("");
+        setView("add");
+      };
 
       const submit = () => {
         if (!fn.trim()) return setErr("Inserisci il nome del locale");
         if (!ft) return setErr("Seleziona una tipologia");
         if (Object.values(fr).some((v) => v == null)) return setErr("Dai un voto a tutte le categorie");
-        const item = { id: Date.now().toString(), name: fn.trim(), tipologia: ft, ratings: { ...fr }, note: fnote.trim(), date: new Date().toISOString() };
-        save([item, ...reviews]);
+
+        if (editingId) {
+          const updated = reviews.map((r) => r.id === editingId
+            ? { ...r, name: fn.trim(), comune: fcomune.trim(), tipologia: ft, ratings: { ...fr }, note: fnote.trim() }
+            : r);
+          save(updated);
+          const updatedItem = updated.find((r) => r.id === editingId);
+          if (detail && detail.id === editingId) setDetail(updatedItem);
+        } else {
+          const item = {
+            id: Date.now().toString(),
+            name: fn.trim(),
+            comune: fcomune.trim(),
+            tipologia: ft,
+            ratings: { ...fr },
+            note: fnote.trim(),
+            date: new Date().toISOString(),
+          };
+          save([item, ...reviews]);
+        }
         reset();
-        setView("list");
+        setView(editingId ? "detail" : "list");
       };
 
-      const del = (id) => { save(reviews.filter((r) => r.id !== id)); if (detail && detail.id === id) { setDetail(null); setView("list"); } };
+      const del = (id) => {
+        save(reviews.filter((r) => r.id !== id));
+        if (detail && detail.id === id) { setDetail(null); setView("list"); }
+      };
+
+      // Export
+      const handleExport = () => {
+        setMenuOpen(false);
+        const data = JSON.stringify(reviews, null, 2);
+        const blob = new Blob([data], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        const today = new Date().toISOString().split("T")[0];
+        a.download = `locali-${today}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      };
+
+      // Import
+      const handleImportClick = () => {
+        setMenuOpen(false);
+        fileInputRef.current?.click();
+      };
+
+      const handleImportFile = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            const imported = JSON.parse(ev.target.result);
+            if (!Array.isArray(imported)) throw new Error();
+            const choice = confirm(
+              `Trovate ${imported.length} recensioni nel file.\n\n` +
+              `OK = unisci con quelle attuali\n` +
+              `Annulla = sostituisci tutto`
+            );
+            if (choice) {
+              // Merge, avoid duplicates by id
+              const existingIds = new Set(reviews.map((r) => r.id));
+              const newOnes = imported.filter((r) => !existingIds.has(r.id));
+              save([...newOnes, ...reviews]);
+              alert(`Importate ${newOnes.length} nuove recensioni.`);
+            } else {
+              save(imported);
+              alert(`Importate ${imported.length} recensioni.`);
+            }
+          } catch (err) {
+            alert("File non valido. Deve essere un file JSON esportato da questa app.");
+          }
+        };
+        reader.readAsText(file);
+        e.target.value = "";
+      };
 
       const filtered = reviews
         .filter((r) => !filter || r.tipologia === filter)
-        .filter((r) => !search || r.name.toLowerCase().includes(search.toLowerCase()))
+        .filter((r) => !search || r.name.toLowerCase().includes(search.toLowerCase()) || (r.comune || "").toLowerCase().includes(search.toLowerCase()))
         .sort((a, b) => sort === "rating" ? avg(b) - avg(a) : new Date(b.date) - new Date(a.date));
 
       const tipLabel = (k) => {
@@ -178,10 +272,11 @@
         marginBottom: 8,
       };
 
+      // Rounded pill-style input
       const inp = {
         width: "100%",
-        padding: "12px 14px",
-        borderRadius: 10,
+        padding: "12px 20px",
+        borderRadius: 99,
         border: "1.5px solid #e4e4e4",
         background: "#fff",
         fontSize: 15,
@@ -189,6 +284,22 @@
         outline: "none",
         transition: "border-color 0.15s",
         fontFamily: "'Instrument Sans', sans-serif",
+      };
+
+      // Textarea needs softer corners but still rounded generously
+      const textareaStyle = {
+        width: "100%",
+        padding: "14px 20px",
+        borderRadius: 22,
+        border: "1.5px solid #e4e4e4",
+        background: "#fff",
+        fontSize: 15,
+        color: "#1a1a1a",
+        outline: "none",
+        transition: "border-color 0.15s",
+        fontFamily: "'Instrument Sans', sans-serif",
+        resize: "vertical",
+        lineHeight: 1.5,
       };
 
       return (
@@ -199,7 +310,16 @@
           background: "#fafafa",
           fontFamily: "'Instrument Sans', sans-serif",
           color: "#1a1a1a",
+          position: "relative",
         }}>
+          {/* Hidden file input for import */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json,.json"
+            onChange={handleImportFile}
+            style={{ display: "none" }}
+          />
 
           {/* Header */}
           <div style={{
@@ -224,22 +344,85 @@
                       {reviews.length} {reviews.length === 1 ? "recensione" : "recensioni"}
                     </span>
                   </div>
-                  <button
-                    onClick={() => { reset(); setView("add"); }}
-                    style={{
-                      width: 40, height: 40, borderRadius: 99,
-                      border: "none", background: "#1a1a1a", color: "#fff",
-                      fontSize: 22, display: "flex", alignItems: "center", justifyContent: "center",
-                      cursor: "pointer", WebkitTapHighlightColor: "transparent",
-                    }}
-                  >
-                    +
-                  </button>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", position: "relative" }}>
+                    {/* Menu button */}
+                    <button
+                      onClick={() => setMenuOpen(!menuOpen)}
+                      style={{
+                        width: 40, height: 40, borderRadius: 99,
+                        border: "1.5px solid #e4e4e4", background: "#fff", color: "#1a1a1a",
+                        fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center",
+                        cursor: "pointer", WebkitTapHighlightColor: "transparent",
+                      }}
+                      aria-label="Menu"
+                    >
+                      ⋯
+                    </button>
+                    {/* Add button */}
+                    <button
+                      onClick={() => { reset(); setView("add"); }}
+                      style={{
+                        width: 40, height: 40, borderRadius: 99,
+                        border: "none", background: "#1a1a1a", color: "#fff",
+                        fontSize: 22, display: "flex", alignItems: "center", justifyContent: "center",
+                        cursor: "pointer", WebkitTapHighlightColor: "transparent",
+                      }}
+                      aria-label="Aggiungi"
+                    >
+                      +
+                    </button>
+                    {/* Dropdown menu */}
+                    {menuOpen && (
+                      <>
+                        <div
+                          onClick={() => setMenuOpen(false)}
+                          style={{
+                            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+                            zIndex: 20,
+                          }}
+                        />
+                        <div style={{
+                          position: "absolute", top: 48, right: 0,
+                          background: "#fff", borderRadius: 14,
+                          border: "1px solid #eee",
+                          boxShadow: "0 8px 32px rgba(0,0,0,0.08)",
+                          minWidth: 180, overflow: "hidden",
+                          zIndex: 30,
+                        }}>
+                          <button
+                            onClick={handleExport}
+                            style={{
+                              display: "block", width: "100%", textAlign: "left",
+                              padding: "12px 16px", border: "none", background: "transparent",
+                              fontSize: 14, color: "#1a1a1a", cursor: "pointer",
+                              fontFamily: "'Instrument Sans', sans-serif",
+                              borderBottom: "1px solid #f2f2f2",
+                              WebkitTapHighlightColor: "transparent",
+                            }}
+                          >
+                            ↓ Esporta dati
+                          </button>
+                          <button
+                            onClick={handleImportClick}
+                            style={{
+                              display: "block", width: "100%", textAlign: "left",
+                              padding: "12px 16px", border: "none", background: "transparent",
+                              fontSize: 14, color: "#1a1a1a", cursor: "pointer",
+                              fontFamily: "'Instrument Sans', sans-serif",
+                              WebkitTapHighlightColor: "transparent",
+                            }}
+                          >
+                            ↑ Importa dati
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </>
               ) : (
                 <>
                   <button
-                    onClick={() => { setView("list"); setDetail(null); }}
+                    onClick={() => { setView(view === "add" && editingId ? "detail" : "list"); reset(); }}
                     style={{
                       background: "none", border: "none", fontSize: 15, fontWeight: 500,
                       color: "#1a1a1a", cursor: "pointer", padding: "8px 0",
@@ -249,7 +432,7 @@
                     ← Indietro
                   </button>
                   <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 800 }}>
-                    {view === "add" ? "Nuova recensione" : "Dettaglio"}
+                    {view === "add" ? (editingId ? "Modifica" : "Nuova recensione") : "Dettaglio"}
                   </span>
                   <div style={{ width: 70 }} />
                 </>
@@ -266,7 +449,7 @@
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 style={{
-                  width: "100%", padding: "11px 14px", borderRadius: 10,
+                  width: "100%", padding: "11px 20px", borderRadius: 99,
                   border: "1.5px solid #e4e4e4", background: "#fff",
                   fontSize: 15, color: "#1a1a1a", outline: "none",
                   marginBottom: 12, transition: "border-color 0.15s",
@@ -327,12 +510,22 @@
                         <div style={{ minWidth: 0, flex: 1 }}>
                           <div style={{
                             fontFamily: "'Playfair Display', serif",
-                            fontSize: 24, fontWeight: 800, lineHeight: 1.25,
+                            fontSize: 24, fontWeight: 800, lineHeight: 1.2,
                             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                             paddingBottom: 2,
                           }}>
                             {r.name}
                           </div>
+                          {r.comune && (
+                            <div style={{
+                              fontFamily: "'Playfair Display', serif",
+                              fontSize: 13, fontWeight: 400, fontStyle: "italic",
+                              color: "#a8a8a8", marginTop: 2,
+                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                            }}>
+                              {r.comune}
+                            </div>
+                          )}
                           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5 }}>
                             <span style={{
                               fontSize: 11, fontWeight: 600, color: "#999",
@@ -360,7 +553,7 @@
             </div>
           )}
 
-          {/* ADD */}
+          {/* ADD / EDIT */}
           {view === "add" && (
             <div style={{ padding: "24px 20px 40px" }}>
               <label style={lbl}>Nome del locale</label>
@@ -374,6 +567,17 @@
                 onBlur={(e) => e.target.style.borderColor = "#e4e4e4"}
               />
 
+              <label style={{ ...lbl, marginTop: 18 }}>Comune</label>
+              <input
+                type="text"
+                placeholder="es. Milano"
+                value={fcomune}
+                onChange={(e) => setFcomune(e.target.value)}
+                style={inp}
+                onFocus={(e) => e.target.style.borderColor = "#1a1a1a"}
+                onBlur={(e) => e.target.style.borderColor = "#e4e4e4"}
+              />
+
               <label style={{ ...lbl, marginTop: 22 }}>Tipologia</label>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
                 {TIPOLOGIE.map((t) => (
@@ -382,11 +586,11 @@
               </div>
 
               <label style={{ ...lbl, marginTop: 26 }}>Voti</label>
-              <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #eee", overflow: "hidden" }}>
+              <div style={{ background: "#fff", borderRadius: 22, border: "1px solid #eee", overflow: "hidden" }}>
                 {CATEGORIES.map((c, i) => (
                   <div key={c.key} style={{
                     display: "flex", justifyContent: "space-between", alignItems: "center",
-                    padding: "12px 16px",
+                    padding: "12px 20px",
                     borderBottom: i < CATEGORIES.length - 1 ? "1px solid #f5f5f5" : "none",
                   }}>
                     <span style={{ fontSize: 14, fontWeight: 500 }}>{c.label}</span>
@@ -401,15 +605,15 @@
                 value={fnote}
                 onChange={(e) => setFnote(e.target.value)}
                 rows={3}
-                style={{ ...inp, resize: "vertical", lineHeight: 1.5 }}
+                style={textareaStyle}
                 onFocus={(e) => e.target.style.borderColor = "#1a1a1a"}
                 onBlur={(e) => e.target.style.borderColor = "#e4e4e4"}
               />
 
               {err && (
                 <div style={{
-                  background: "#fef5f5", border: "1px solid #f0d5d5", borderRadius: 10,
-                  padding: "10px 14px", marginTop: 16, fontSize: 13, color: "#c44", fontWeight: 500,
+                  background: "#fef5f5", border: "1px solid #f0d5d5", borderRadius: 99,
+                  padding: "10px 20px", marginTop: 16, fontSize: 13, color: "#c44", fontWeight: 500,
                 }}>
                   {err}
                 </div>
@@ -419,13 +623,13 @@
                 onClick={submit}
                 style={{
                   width: "100%", marginTop: 24, padding: "15px",
-                  borderRadius: 12, border: "none",
+                  borderRadius: 99, border: "none",
                   background: "#1a1a1a", color: "#fff",
                   fontSize: 15, fontWeight: 600, cursor: "pointer",
                   WebkitTapHighlightColor: "transparent",
                 }}
               >
-                Salva
+                {editingId ? "Salva modifiche" : "Salva"}
               </button>
             </div>
           )}
@@ -436,12 +640,23 @@
             return (
               <div style={{ padding: "28px 20px 40px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-                  <h2 style={{
-                    fontFamily: "'Playfair Display', serif",
-                    fontSize: 38, fontWeight: 800, lineHeight: 1.15, flex: 1,
-                  }}>
-                    {detail.name}
-                  </h2>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <h2 style={{
+                      fontFamily: "'Playfair Display', serif",
+                      fontSize: 38, fontWeight: 800, lineHeight: 1.15,
+                    }}>
+                      {detail.name}
+                    </h2>
+                    {detail.comune && (
+                      <p style={{
+                        fontFamily: "'Playfair Display', serif",
+                        fontSize: 15, fontWeight: 400, fontStyle: "italic",
+                        color: "#a8a8a8", marginTop: 4,
+                      }}>
+                        {detail.comune}
+                      </p>
+                    )}
+                  </div>
                   <span style={{
                     fontFamily: "'Instrument Sans', sans-serif",
                     fontSize: 40, fontWeight: 700, flexShrink: 0, marginLeft: 16, lineHeight: 1,
@@ -450,7 +665,7 @@
                   </span>
                 </div>
 
-                <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 30 }}>
+                <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 30, marginTop: 10 }}>
                   <span style={{
                     fontSize: 12, fontWeight: 600, color: "#999",
                     background: "#f0f0f0", padding: "3px 12px", borderRadius: 99,
@@ -476,7 +691,7 @@
 
                 {detail.note && (
                   <div style={{
-                    background: "#f8f8f8", borderRadius: 10, padding: "14px 16px",
+                    background: "#f8f8f8", borderRadius: 22, padding: "14px 20px",
                     marginTop: 24, borderLeft: "3px solid #e0e0e0",
                   }}>
                     <p style={{
@@ -490,10 +705,23 @@
                 )}
 
                 <button
+                  onClick={() => startEdit(detail)}
+                  style={{
+                    width: "100%", marginTop: 32, padding: "14px",
+                    borderRadius: 99, border: "none",
+                    background: "#1a1a1a", color: "#fff",
+                    fontSize: 14, fontWeight: 600, cursor: "pointer",
+                    WebkitTapHighlightColor: "transparent",
+                  }}
+                >
+                  Modifica
+                </button>
+
+                <button
                   onClick={() => { if (confirm("Eliminare questa recensione?")) del(detail.id); }}
                   style={{
-                    width: "100%", marginTop: 32, padding: "13px",
-                    borderRadius: 10, border: "1.5px solid #e8e8e8",
+                    width: "100%", marginTop: 10, padding: "13px",
+                    borderRadius: 99, border: "1.5px solid #e8e8e8",
                     background: "transparent", color: "#c44",
                     fontSize: 14, fontWeight: 600, cursor: "pointer",
                     WebkitTapHighlightColor: "transparent",
