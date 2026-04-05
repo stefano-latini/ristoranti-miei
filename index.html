@@ -123,6 +123,7 @@
       const [ft, setFt] = useState(null);
       const [fr, setFr] = useState({ location: 0, menu: 0, servizio: 0, conto: 0 });
       const [fnote, setFnote] = useState("");
+      const [fdate, setFdate] = useState("");
       const [err, setErr] = useState("");
 
       useEffect(() => {
@@ -143,10 +144,24 @@
         return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
       };
 
+      const todayISO = () => {
+        const d = new Date();
+        const pad = (n) => String(n).padStart(2, "0");
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      };
+
+      const toDateInput = (iso) => {
+        if (!iso) return todayISO();
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return todayISO();
+        const pad = (n) => String(n).padStart(2, "0");
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      };
+
       const reset = () => {
         setFn(""); setFcomune(""); setFt(null);
         setFr({ location: 0, menu: 0, servizio: 0, conto: 0 });
-        setFnote(""); setErr(""); setEditingId(null);
+        setFnote(""); setFdate(todayISO()); setErr(""); setEditingId(null);
       };
 
       const startEdit = (r) => {
@@ -156,6 +171,7 @@
         setFt(r.tipologia);
         setFr({ ...r.ratings });
         setFnote(r.note || "");
+        setFdate(toDateInput(r.date));
         setErr("");
         setView("add");
       };
@@ -164,10 +180,14 @@
         if (!fn.trim()) return setErr("Inserisci il nome del locale");
         if (!ft) return setErr("Seleziona una tipologia");
         if (Object.values(fr).some((v) => v == null)) return setErr("Dai un voto a tutte le categorie");
+        if (!fdate) return setErr("Inserisci la data della visita");
+
+        // Convert YYYY-MM-DD to ISO, preserve original time if editing same day
+        const dateISO = new Date(fdate + "T12:00:00").toISOString();
 
         if (editingId) {
           const updated = reviews.map((r) => r.id === editingId
-            ? { ...r, name: fn.trim(), comune: fcomune.trim(), tipologia: ft, ratings: { ...fr }, note: fnote.trim() }
+            ? { ...r, name: fn.trim(), comune: fcomune.trim(), tipologia: ft, ratings: { ...fr }, note: fnote.trim(), date: dateISO }
             : r);
           save(updated);
           const updatedItem = updated.find((r) => r.id === editingId);
@@ -180,7 +200,7 @@
             tipologia: ft,
             ratings: { ...fr },
             note: fnote.trim(),
-            date: new Date().toISOString(),
+            date: dateISO,
           };
           save([item, ...reviews]);
         }
@@ -526,17 +546,6 @@
                               {r.comune}
                             </div>
                           )}
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5 }}>
-                            <span style={{
-                              fontSize: 11, fontWeight: 600, color: "#999",
-                              background: "#f5f5f5", padding: "2px 8px", borderRadius: 99,
-                            }}>
-                              {tipLabel(r.tipologia)}
-                            </span>
-                            <span style={{ fontSize: 11, color: "#ccc" }}>
-                              {new Date(r.date).toLocaleDateString("it-IT", { day: "numeric", month: "short" })}
-                            </span>
-                          </div>
                         </div>
                         <div style={{
                           fontFamily: "'Instrument Sans', sans-serif",
@@ -584,6 +593,16 @@
                   <Pill key={t.key} label={t.label} selected={ft === t.key} onClick={() => { setFt(t.key); setErr(""); }} />
                 ))}
               </div>
+
+              <label style={{ ...lbl, marginTop: 22 }}>Data visita</label>
+              <input
+                type="date"
+                value={fdate}
+                onChange={(e) => { setFdate(e.target.value); setErr(""); }}
+                style={inp}
+                onFocus={(e) => e.target.style.borderColor = "#1a1a1a"}
+                onBlur={(e) => e.target.style.borderColor = "#e4e4e4"}
+              />
 
               <label style={{ ...lbl, marginTop: 26 }}>Voti</label>
               <div style={{ background: "#fff", borderRadius: 22, border: "1px solid #eee", overflow: "hidden" }}>
