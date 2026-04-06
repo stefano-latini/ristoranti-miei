@@ -11,9 +11,9 @@
   <meta name="apple-mobile-web-app-title" content="I miei locali" />
   <title>I miei locali</title>
 
-  <!-- Favicon & Apple touch icon: minimal crossed cutlery -->
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%231a1a1a'/><g stroke='%23f0ede6' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' fill='none'><path d='M22 14 L22 50'/><path d='M18 14 L18 26 Q18 30 22 30 Q26 30 26 26 L26 14'/><path d='M42 14 Q36 14 36 22 Q36 30 42 30 L42 50'/></g></svg>" />
-  <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='40' fill='%231a1a1a'/><g stroke='%23f0ede6' stroke-width='8' stroke-linecap='round' stroke-linejoin='round' fill='none'><path d='M62 40 L62 140'/><path d='M51 40 L51 74 Q51 84 62 84 Q73 84 73 74 L73 40'/><path d='M118 40 Q101 40 101 62 Q101 84 118 84 L118 140'/></g></svg>" />
+  <!-- Favicon & Apple touch icon: minimal crossed cutlery (PNG for Safari support) -->
+  <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAADm0lEQVR42u2XTWhcVRTHf+fe926aySSQtMVkioimgtQUF9I2daMLwQ+kNht34kZBSlciCIo7N7oXu3QnggtBUEH64cKNumjXUmoNzkxmmtjMe2Rm3rx7j4vMhLT5mFeTIIL/zRseZ9753//5uOcI67CAr1Qqh4ELqrogIif774W9Q0XkN+CbLMs+azabNwEDBNnk/HngkjFmVlVRVfYTIoKIoKrLqvputVr9HLAW0Onp6WeNMVdEZEpV/eA/7C9UVYOIjBljzpdKpXqapr/IzMzMERH5VUQeUdUciDhYBECBTETO2omJiXdEZKF/8oN2PlBWRcSp6kNGVV/rM5Ld4vcAOhfJH6vreDESkTlVlZ0IqCree0RMn+c6jDHbEh28L0BERGTU7ORYRMjznKmpKV5+6QUeP/4Y82dOcfr008zNnaDd7mw4s9bSShIWzp/j2uXvuHb5Wy68/RZJkmCt3VWwaJicIyOOY8dmWFpqcPToYbwPtFxKnuf3BVZoJQmzs4+CjVlrr+F9GJoPUZGYZlkP7wO9Xk4IgTzPt+SFiJCmKWtrazjnWF1NCuWOKZJY1lqiyPaf0Zb4hxCI44h6fYlOp4uq8me1irV2aEJGw+rF+0CaptxdXaVcLpHnOb2e3zZnup0u3ntUlU6nU0iBaLfS8yEwXh7j1XOv8MzZeUZHDzE6eogvvvwKVWXz96MoYnllhburLZyLqdeXiOPonysgIuTeMzk5yfyZU+uEvGd8vMyVqz/2CciWqsnznBCULMv2poD3nrFSies3bnD8iaf48IP3OPnkCV5/402CKuPjZfLcbySqtZY0TanX6lhjWFn5iziOhyowNAmNMTQaDbz3RFFEfalBuO/0AEaETrfLrd9vc/uPRVqtoT2geBU45zYcOud27NmDsBhjCl/npmh/3+73fsDwL+N/Av8dAkUH1QcdaAsTiOMI5+ICdjFxHBcmUGgGNGK4c2eZarU+dPRuNps454oPiJVKRYvIGscx1lra7fa249jAzjmHMWZXu3sOp6q3RETvGfi2OVmv1xv6UREhy7LCzgFvROTr/tUfhslbpLcXtAv9LeknY639VFVbm5aGQi15D3YKDCaaj8zi4uLNEMJFY4ztV4U/4K0oWGtjVf24Vqv9YAGbpun1crncEJHnjDEj+33hbF4ERERCCJ9Uq9X3AWP7ktgkSX4ul8vfA0eAhwG3j0uqAl0Rueq9v1ir1S4NFPkbYGnB+VsRn8QAAAAASUVORK5CYII=" />
+  <link rel="apple-touch-icon" sizes="180x180" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAYAAAA9zQYyAAAC5klEQVR42u3dQW6jQBCGUbrlU3CESNnl/ifIbqQ5AtfIrGZnJRAwdP28t4ysKJjP5TJITpsGMc/z10Rpy7K0q/+GJmCSAm8iJinuJmKS4m5CJinsJmSSwu5i5mpHdtOETNK07mImaVp3MZMUdRMySStIFzNJ07qLmaSou5hJirp7qkjSj3x1wNVTuouZpKi7mEmK2g7NPXZo05mKU7qLmaSorRxkrxymM5WntAlN7oQ2nak+pU1osndoiAjaukHC2mFCY+WAUTXrBiY0CBoEDduCtj9jQoOgQdAgaAQNER5pB/T3z+f09v5x+uOuOM69RjwuE/rJSf7pZB/9OAQNggZBI2gQNKfae4Ui8QqHoBE0CBoEDYJG0CBoEDQIGgSNoCnnt7evU297CxpBg6BB0CBoBA2CBkGDoEHQCJqStt7GTr7tLWjiPFIPbO0XLPoiRhO6dMCj/n4EfXpsohY0CBoEDYJG0AM662ZB+k0JQd8oajHX0O72z+ufXXpLiHXNJcU7vCj73WNeGwOCBkGDoEHQJHp4CjL8v4KRehXHhL4hV3EEjaBB0CBoEDSCBkGDoEHQIGgEDYIGQYOgQdAIGgQNggZBg6ARNAgaBA2CBkEjaBA0CBoEDYJG0CBoEDQIGgSNoEHQIGgQNIL2FCBoEDQIGgSNoEHQIGgQNAgaQYOgQdAg6J3e3j82/dzxCbrcSU872enH95M2z/OXNypMaBA0CBoEjaChftDLsjRPAyY0CBoEDduCtkeTYFmWZkJj5YDhg7Z2UH3dMKGxckCZoK0dVF43TGjyVw5TmqrT2YTmHh8KTWkqTudvJ7SoqRazlYN7rBymNBWn86oJLWqqxLx65RA1FWK2Q3OvHdqUptJ03jyhRc3IMf9q5RA1o8Y8TdO0K07fXMooIR/yodC0ZqSYdwctakaKeffKYQVhlJAPm9CmNSN187IATWuuGIAvn6jC5sx38lNXBHGL+NUu23nFLeJX+Af6p/1M8ogCPgAAAABJRU5ErkJggg==" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;0,900;1,400;1,700&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -68,6 +68,33 @@
       --danger-bg: #2a1818;
       --danger-border: #4a2828;
       --shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    @media (prefers-color-scheme: dark) {
+      [data-theme="auto"] {
+        --bg: #0f0f10;
+        --bg-translucent: rgba(15,15,16,0.92);
+        --surface: #1a1a1c;
+        --surface-alt: #202023;
+        --text: #f0ede6;
+        --text-muted: #b8b3a8;
+        --text-faint: #85807a;
+        --text-ghost: #706b66;
+        --text-light: #5c5854;
+        --text-lighter: #4a4743;
+        --border: #2a2a2d;
+        --border-strong: #333336;
+        --border-soft: #252528;
+        --border-faint: #222225;
+        --border-ghost: #252528;
+        --pill-bg: #252528;
+        --pill-bg-2: #2a2a2d;
+        --accent: #f0ede6;
+        --accent-inverse: #0f0f10;
+        --danger: #e67373;
+        --danger-bg: #2a1818;
+        --danger-border: #4a2828;
+        --shadow: 0 8px 32px rgba(0,0,0,0.4);
+      }
     }
     html, body { background: var(--bg); }
     body {
@@ -190,31 +217,18 @@
       });
       const fileInputRef = useRef(null);
 
-      // Resolve actual theme (auto → system preference) and apply it
+      // Apply theme: CSS handles the "auto" case via prefers-color-scheme media query
       useEffect(() => {
-        const mql = window.matchMedia("(prefers-color-scheme: dark)");
-        const applyTheme = () => {
-          const resolved = theme === "auto" ? (mql.matches ? "dark" : "light") : theme;
-          document.documentElement.setAttribute("data-theme", resolved);
-          // Update theme-color dynamically for manual override;
-          // for "auto" we let the media-query meta tags handle it
-          if (theme !== "auto") {
-            let meta = document.querySelector('meta[name="theme-color"]:not([media])');
-            if (!meta) {
-              meta = document.createElement("meta");
-              meta.setAttribute("name", "theme-color");
-              document.head.appendChild(meta);
-            }
-            meta.setAttribute("content", resolved === "dark" ? "#0f0f10" : "#fafafa");
-          } else {
-            const extra = document.querySelector('meta[name="theme-color"]:not([media])');
-            if (extra) extra.remove();
-          }
-        };
-        applyTheme();
-        if (theme === "auto") {
-          mql.addEventListener("change", applyTheme);
-          return () => mql.removeEventListener("change", applyTheme);
+        document.documentElement.setAttribute("data-theme", theme);
+        // Manual themes need a theme-color meta with no media query to override the declared ones
+        const extra = document.querySelector('meta[name="theme-color"][data-dynamic]');
+        if (extra) extra.remove();
+        if (theme !== "auto") {
+          const meta = document.createElement("meta");
+          meta.setAttribute("name", "theme-color");
+          meta.setAttribute("data-dynamic", "1");
+          meta.setAttribute("content", theme === "dark" ? "#0f0f10" : "#fafafa");
+          document.head.appendChild(meta);
         }
         try { localStorage.setItem("ristoranti_theme", theme); } catch (e) {}
       }, [theme]);
@@ -374,7 +388,15 @@
 
       const filtered = reviews
         .filter((r) => !filter || r.tipologia === filter)
-        .filter((r) => !search || r.name.toLowerCase().includes(search.toLowerCase()) || (r.comune || "").toLowerCase().includes(search.toLowerCase()))
+        .filter((r) => {
+          if (!search) return true;
+          const q = search.toLowerCase();
+          return (
+            r.name.toLowerCase().includes(q) ||
+            (r.comune || "").toLowerCase().includes(q) ||
+            (r.note || "").toLowerCase().includes(q)
+          );
+        })
         .sort((a, b) => sort === "rating" ? avg(b) - avg(a) : new Date(b.date) - new Date(a.date));
 
       const tipLabel = (k) => {
@@ -512,58 +534,79 @@
                           background: "var(--surface)", borderRadius: 14,
                           border: "1px solid var(--border)",
                           boxShadow: "var(--shadow)",
-                          minWidth: 180, overflow: "hidden",
+                          minWidth: 220, overflow: "hidden",
                           zIndex: 30,
                         }}>
-                          {[
-                            {
-                              key: "light",
-                              label: "Tema chiaro",
-                              icon: (
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                  <circle cx="12" cy="12" r="4" />
-                                  <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-                                </svg>
-                              ),
-                            },
-                            {
-                              key: "dark",
-                              label: "Tema scuro",
-                              icon: (
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
-                                </svg>
-                              ),
-                            },
-                            {
-                              key: "auto",
-                              label: "Automatico",
-                              icon: (
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                  <circle cx="12" cy="12" r="9" />
-                                  <path d="M12 3 A9 9 0 0 1 12 21 Z" fill="currentColor" stroke="none" />
-                                </svg>
-                              ),
-                            },
-                          ].map((opt) => (
-                            <button
-                              key={opt.key}
-                              onClick={() => { setTheme(opt.key); setMenuOpen(false); }}
-                              style={{
-                                display: "flex", alignItems: "center", gap: 10,
-                                width: "100%", textAlign: "left",
-                                padding: "12px 16px", border: "none",
-                                background: theme === opt.key ? "var(--pill-bg)" : "transparent",
-                                fontSize: 14, color: "var(--text)", cursor: "pointer",
-                                fontFamily: "'Instrument Sans', sans-serif",
-                                borderBottom: "1px solid var(--border-soft)",
-                                WebkitTapHighlightColor: "transparent",
-                              }}
-                            >
-                              <span style={{ display: "inline-flex", width: 14, height: 14, color: "var(--text-faint)" }}>{opt.icon}</span>
-                              {opt.label}
-                            </button>
-                          ))}
+                          {/* Theme segmented control */}
+                          <div style={{
+                            padding: "12px 12px 10px",
+                            borderBottom: "1px solid var(--border-soft)",
+                          }}>
+                            <div style={{
+                              display: "flex",
+                              background: "var(--pill-bg)",
+                              borderRadius: 99,
+                              padding: 3,
+                              gap: 2,
+                            }}>
+                              {[
+                                {
+                                  key: "auto",
+                                  label: "Auto",
+                                  icon: null,
+                                },
+                                {
+                                  key: "light",
+                                  label: null,
+                                  icon: (
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                      <circle cx="12" cy="12" r="4" />
+                                      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+                                    </svg>
+                                  ),
+                                },
+                                {
+                                  key: "dark",
+                                  label: null,
+                                  icon: (
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                      <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+                                    </svg>
+                                  ),
+                                },
+                              ].map((opt) => {
+                                const active = theme === opt.key;
+                                return (
+                                  <button
+                                    key={opt.key}
+                                    onClick={() => setTheme(opt.key)}
+                                    style={{
+                                      flex: 1,
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      gap: 6,
+                                      padding: "8px 10px",
+                                      border: "none",
+                                      borderRadius: 99,
+                                      background: active ? "var(--surface)" : "transparent",
+                                      color: active ? "var(--text)" : "var(--text-faint)",
+                                      fontSize: 13,
+                                      fontWeight: 600,
+                                      cursor: "pointer",
+                                      fontFamily: "'Instrument Sans', sans-serif",
+                                      boxShadow: active ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                                      transition: "all 0.15s",
+                                      WebkitTapHighlightColor: "transparent",
+                                    }}
+                                  >
+                                    {opt.icon}
+                                    {opt.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
                           <button
                             onClick={handleExport}
                             style={{
