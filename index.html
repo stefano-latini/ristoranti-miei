@@ -149,6 +149,12 @@
     .card-item { transition: background 0.1s; }
     @media (hover: hover) { .card-item:hover { background: var(--surface-alt) !important; } }
 
+    /* Localini map pins (divIcon) */
+    .localini-pin {
+      background: transparent !important;
+      border: none !important;
+    }
+
     /* Leaflet map styling */
     .leaflet-container {
       background: var(--surface-alt);
@@ -229,20 +235,8 @@
 
     const TIPOLOGIE = [
       { key: "pranzo_cena", label: "Pranzo / Cena" },
-      { key: "colazione", label: "Colazione" },
+      { key: "colazione", label: "Bar / Colazione" },
       { key: "aperitivo", label: "Aperitivo" },
-    ];
-
-    // Tag list shown only when tipologia is "pranzo_cena"
-    const TAGS_PRANZO_CENA = [
-      "Pizza",
-      "Carne",
-      "Pesce",
-      "Economico",
-      "Adatto ai bambini",
-      "Veloce",
-      "Cucina elaborata",
-      "Cucina semplice",
     ];
 
     // Etichette shown depending on tipologia
@@ -258,6 +252,8 @@
       { key: "veloce", label: "Veloce" },
       { key: "elaborata", label: "Cucina elaborata" },
       { key: "semplice", label: "Cucina semplice" },
+      { key: "vegano", label: "Vegano" },
+      { key: "senza_glutine", label: "Senza glutine" },
     ];
 
     const ETICHETTE_COLAZIONE = [
@@ -294,6 +290,30 @@
     const CRITERI_PRANZO_CENA = ETICHETTE_PRANZO_CENA;
 
     const STORAGE_KEY = "ristoranti_reviews";
+
+    // Pin colors by tipologia
+    const PIN_COLORS = {
+      pranzo_cena: "#2563eb",   // blue
+      colazione:   "#dc2626",   // red
+      aperitivo:   "#f59e0b",   // amber/yellow
+    };
+    const DEFAULT_PIN_COLOR = "#6b7280";
+
+    // Build a Leaflet divIcon with a colored map pin SVG
+    function makePinIcon(color) {
+      if (typeof L === "undefined") return null;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="42" viewBox="0 0 30 42">
+        <path d="M15 0 C6.7 0 0 6.7 0 15 c0 11 15 27 15 27 s15 -16 15 -27 C30 6.7 23.3 0 15 0 z" fill="${color}" stroke="#fff" stroke-width="2"/>
+        <circle cx="15" cy="15" r="5" fill="#fff"/>
+      </svg>`;
+      return L.divIcon({
+        html: svg,
+        className: "localini-pin",
+        iconSize: [30, 42],
+        iconAnchor: [15, 42],
+        popupAnchor: [0, -38],
+      });
+    }
 
     const ScoreInput = ({ value, onChange }) => {
       const editable = !!onChange;
@@ -419,6 +439,8 @@
       const formMapContainerRef = useRef(null);
       const listMapRef = useRef(null);
       const listMapContainerRef = useRef(null);
+      const detailMapRef = useRef(null);
+      const detailMapContainerRef = useRef(null);
 
       useEffect(() => {
         window.scrollTo(0, 0);
@@ -672,7 +694,7 @@
       };
 
       // Export PDF (uses jsPDF loaded from CDN)
-      const handleExportPDF = () => {
+      const handleExportPDF = async () => {
         setMenuOpen(false);
         if (typeof window.jspdf === "undefined") {
           alert("Libreria PDF non ancora caricata. Attendi qualche secondo e riprova.");
@@ -685,11 +707,80 @@
         const margin = 48;
         let y = margin;
 
-        // Title
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(24);
-        doc.text("Localini", margin, y);
-        y += 22;
+        // Build the title as a canvas image: cutlery icon + "Localini" in Playfair Display.
+        // The browser already has Playfair loaded for the UI, so canvas can render with it.
+        const buildTitleImage = async () => {
+          // Load the cutlery PNG (cream version, but we'll recolor to dark for the white PDF page)
+          const loadImg = (src) => new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+            img.src = src;
+          });
+          let cutleryImg = null;
+          try {
+            cutleryImg = await loadImg("./icons/cutlery-dark.png");
+          } catch (e) {
+            // ignore — we'll just render the text without the icon
+          }
+
+          // Wait one frame so Playfair is sure to be ready
+          await document.fonts.ready;
+
+          const scale = 3; // retina-ish
+          const titleText = "Localini";
+          // Measure the text first using a temporary canvas
+          const measureCanvas = document.createElement("canvas");
+          const mctx = measureCanvas.getContext("2d");
+          mctx.font = `800 56px 'Playfair Display', serif`;
+          const textWidth = mctx.measureText(titleText).width;
+          const iconHeight = 56;
+          const iconWidth = cutleryImg ? Math.round(cutleryImg.width * (iconHeight / cutleryImg.height)) : 0;
+          const gap = cutleryImg ? 16 : 0;
+          const totalWidth = Math.ceil(iconWidth + gap + textWidth);
+          const totalHeight = 70;
+
+          const canvas = document.createElement("canvas");
+          canvas.width = totalWidth * scale;
+          canvas.height = totalHeight * scale;
+          const ctx = canvas.getContext("2d");
+          ctx.scale(scale, scale);
+
+          // Draw icon
+          if (cutleryImg) {
+            ctx.drawImage(cutleryImg, 0, 7, iconWidth, iconHeight);
+          }
+
+          // Draw title text
+          ctx.font = `800 56px 'Playfair Display', serif`;
+          ctx.fillStyle = "#1a1a1a";
+          ctx.textBaseline = "alphabetic";
+          ctx.fillText(titleText, iconWidth + gap, 56);
+
+          return {
+            dataUrl: canvas.toDataURL("image/png"),
+            width: totalWidth,
+            height: totalHeight,
+          };
+        };
+
+        try {
+          const titleImg = await buildTitleImage();
+          // Render the title image at a tasteful size at the top of the page
+          const targetHeight = 36;
+          const targetWidth = titleImg.width * (targetHeight / titleImg.height);
+          doc.addImage(titleImg.dataUrl, "PNG", margin, y, targetWidth, targetHeight);
+          y += targetHeight + 6;
+        } catch (e) {
+          // Fallback: plain helvetica title
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(24);
+          doc.text("Localini", margin, y + 18);
+          y += 28;
+        }
+
+        // Subtitle
         doc.setFont("helvetica", "normal");
         doc.setFontSize(10);
         doc.setTextColor(120);
@@ -697,10 +788,10 @@
           `${reviews.length} ${reviews.length === 1 ? "recensione" : "recensioni"} • Esportato il ${new Date().toLocaleDateString("it-IT")}`,
           margin, y
         );
-        y += 20;
+        y += 24;
         doc.setTextColor(0);
 
-        // Sort reviews by avg desc then name
+        // Sort reviews by avg desc
         const sorted = [...reviews].sort((a, b) => avg(b) - avg(a));
 
         sorted.forEach((r, idx) => {
@@ -717,17 +808,11 @@
           // Estimate block height to handle page breaks
           const noteLines = r.note ? doc.splitTextToSize(r.note, pageWidth - margin * 2 - 10) : [];
           const labelLines = labels ? doc.splitTextToSize(labels, pageWidth - margin * 2 - 10) : [];
-          const blockHeight = 60 + noteLines.length * 11 + labelLines.length * 10;
+          const blockHeight = 60 + noteLines.length * 11 + labelLines.length * 11;
 
           if (y + blockHeight > pageHeight - margin) {
             doc.addPage();
             y = margin;
-          }
-
-          // Separator line above (except first)
-          if (idx > 0) {
-            doc.setDrawColor(220);
-            doc.line(margin, y - 8, pageWidth - margin, y - 8);
           }
 
           // Name + score
@@ -759,7 +844,7 @@
           // Etichette
           if (labelLines.length > 0) {
             doc.setFontSize(9);
-            doc.setTextColor(100);
+            doc.setTextColor(110);
             labelLines.forEach((line) => {
               doc.text(line, margin, y);
               y += 11;
@@ -777,7 +862,8 @@
             });
           }
 
-          y += 14;
+          // Generous spacing between reviews instead of a separator line
+          y += 22;
         });
 
         const today = new Date().toISOString().split("T")[0];
@@ -863,7 +949,8 @@
             attribution: "© OpenStreetMap",
             maxZoom: 19,
           }).addTo(map);
-          const marker = L.marker([fcoords.lat, fcoords.lng], { draggable: true }).addTo(map);
+          const formPinColor = PIN_COLORS[ft] || DEFAULT_PIN_COLOR;
+          const marker = L.marker([fcoords.lat, fcoords.lng], { draggable: true, icon: makePinIcon(formPinColor) }).addTo(map);
           marker.on("dragend", (e) => {
             const pos = e.target.getLatLng();
             shouldRecenterMap.current = false;
@@ -889,6 +976,14 @@
           setTimeout(() => formMapRef.current.invalidateSize(), 100);
         }
       }, [view, fcoords]);
+
+      // Update form marker color when tipologia changes
+      useEffect(() => {
+        if (formMarkerRef.current && typeof L !== "undefined") {
+          const color = PIN_COLORS[ft] || DEFAULT_PIN_COLOR;
+          formMarkerRef.current.setIcon(makePinIcon(color));
+        }
+      }, [ft]);
 
       // Clean up form map when leaving add view
       useEffect(() => {
@@ -929,7 +1024,7 @@
         const bounds = [];
         withCoords.forEach((r) => {
           const a = avg(r);
-          const marker = L.marker([r.lat, r.lng]).addTo(map);
+          const marker = L.marker([r.lat, r.lng], { icon: makePinIcon(PIN_COLORS[r.tipologia] || DEFAULT_PIN_COLOR) }).addTo(map);
           const popupHtml = `
             <div style="font-family: 'Instrument Sans', sans-serif; min-width: 160px;">
               <div style="font-family: 'Playfair Display', serif; font-weight: 800; font-size: 17px; line-height: 1.2;">${r.name.replace(/</g, "&lt;")}</div>
@@ -978,6 +1073,44 @@
         if (view !== "map" && listMapRef.current) {
           listMapRef.current.remove();
           listMapRef.current = null;
+        }
+      }, [view]);
+
+      // Build a read-only mini-map in the detail view
+      useEffect(() => {
+        if (view !== "detail" || !detail || detail.lat == null || detail.lng == null) return;
+        if (!detailMapContainerRef.current) return;
+        if (typeof L === "undefined") return;
+
+        // Always recreate the map for the current detail (different review = different map)
+        if (detailMapRef.current) {
+          detailMapRef.current.remove();
+          detailMapRef.current = null;
+        }
+
+        const map = L.map(detailMapContainerRef.current, {
+          zoomControl: true,
+          attributionControl: true,
+          dragging: true,
+          scrollWheelZoom: false,
+        }).setView([detail.lat, detail.lng], 16);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "© OpenStreetMap",
+          maxZoom: 19,
+        }).addTo(map);
+        L.marker(
+          [detail.lat, detail.lng],
+          { icon: makePinIcon(PIN_COLORS[detail.tipologia] || DEFAULT_PIN_COLOR) }
+        ).addTo(map);
+        detailMapRef.current = map;
+        setTimeout(() => map.invalidateSize(), 100);
+      }, [view, detail]);
+
+      // Clean up detail map when leaving detail
+      useEffect(() => {
+        if (view !== "detail" && detailMapRef.current) {
+          detailMapRef.current.remove();
+          detailMapRef.current = null;
         }
       }, [view]);
 
@@ -1646,9 +1779,15 @@
           {/* DETAIL */}
           {view === "detail" && detail && (() => {
             const a = avg(detail);
+            const detailLabels = ETICHETTE_BY_TIPOLOGIA[detail.tipologia] || [];
+            const selectedLabels = (detail.criteri || [])
+              .map((k) => detailLabels.find((x) => x.key === k))
+              .filter(Boolean);
+            const hasMap = detail.lat != null && detail.lng != null;
+            const formattedDate = new Date(detail.date).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
             return (
               <div style={{ padding: "28px 20px 40px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6, gap: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 22, gap: 16 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <h2 style={{
                       fontFamily: "'Playfair Display', serif",
@@ -1674,18 +1813,6 @@
                   </span>
                 </div>
 
-                <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 30, marginTop: 10 }}>
-                  <span style={{
-                    fontSize: 12, fontWeight: 600, color: "var(--text-faint)",
-                    background: "var(--pill-bg-2)", padding: "3px 12px", borderRadius: 99,
-                  }}>
-                    {tipLabel(detail.tipologia)}
-                  </span>
-                  <span style={{ fontSize: 12, color: "var(--text-lighter)" }}>
-                    {new Date(detail.date).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-                  </span>
-                </div>
-
                 {CATEGORIES.map((c) => (
                   <div key={c.key} style={{
                     display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -1698,10 +1825,57 @@
                   </div>
                 ))}
 
+                {selectedLabels.length > 0 && (
+                  <div style={{ marginTop: 24 }}>
+                    <div style={{
+                      fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase",
+                      color: "var(--text-faint)", marginBottom: 10,
+                    }}>
+                      Etichette
+                    </div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {selectedLabels.map((l) => (
+                        <span key={l.key} style={{
+                          fontSize: 13, fontWeight: 500,
+                          background: "var(--pill-bg)", color: "var(--text)",
+                          padding: "6px 14px", borderRadius: 99,
+                          border: "1px solid var(--border)",
+                        }}>
+                          {l.label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {hasMap && (
+                  <div style={{ marginTop: 24 }}>
+                    <div
+                      ref={detailMapContainerRef}
+                      style={{
+                        width: "100%",
+                        height: 220,
+                        borderRadius: 18,
+                        overflow: "hidden",
+                        border: "1px solid var(--border)",
+                      }}
+                    />
+                  </div>
+                )}
+
+                <div style={{
+                  marginTop: 22,
+                  fontSize: 13,
+                  color: "var(--text-lighter)",
+                  textAlign: "center",
+                }}>
+                  {formattedDate}
+                </div>
+
                 {detail.note && (
                   <div style={{
                     background: "var(--surface-alt)", borderRadius: 22, padding: "14px 20px",
-                    marginTop: 24, borderLeft: "3px solid var(--border-strong)",
+                    marginTop: 22, borderLeft: "3px solid var(--border-strong)",
                   }}>
                     <p style={{
                       margin: 0, fontSize: 19, lineHeight: 1.6,
