@@ -248,6 +248,9 @@
       { key: "pizza", label: "Pizza" },
       { key: "carne", label: "Carne" },
       { key: "pesce", label: "Pesce" },
+      { key: "etnico", label: "Etnico" },
+      { key: "panini", label: "Panini" },
+      { key: "pub", label: "Pub" },
       { key: "economico", label: "Economico" },
       { key: "bambini", label: "Adatto ai bambini" },
       { key: "veloce", label: "Veloce" },
@@ -371,6 +374,9 @@
       const [fcoords, setFcoords] = useState(null); // { lat, lng }
       const [geocoding, setGeocoding] = useState(false);
       const [geocodeErr, setGeocodeErr] = useState("");
+      const [geocodeResults, setGeocodeResults] = useState([]); // list of candidate locations
+      const [geocodeIndex, setGeocodeIndex] = useState(-1); // current position in the list
+      const [geocodeQuery, setGeocodeQuery] = useState(""); // the query that produced the current results
       const shouldRecenterMap = useRef(false); // true right after a geocode, false after user tap/drag
       const [err, setErr] = useState("");
       const formMapRef = useRef(null);
@@ -420,6 +426,7 @@
         setFr({ location: 0, menu: 0, servizio: 0, conto: 0 });
         setFnote(""); setFdate(todayISO()); setFcriteri([]);
         setFcoords(null); setGeocoding(false); setGeocodeErr("");
+        setGeocodeResults([]); setGeocodeIndex(-1); setGeocodeQuery("");
         setErr(""); setEditingId(null);
       };
 
@@ -433,6 +440,7 @@
         setFdate(toDateInput(r.date));
         setFcriteri(Array.isArray(r.criteri) ? r.criteri : []);
         setFcoords(r.lat != null && r.lng != null ? { lat: r.lat, lng: r.lng } : null);
+        setGeocodeResults([]); setGeocodeIndex(-1); setGeocodeQuery(""); setGeocodeErr("");
         shouldRecenterMap.current = true;
         setErr("");
         setView("add");
@@ -474,34 +482,68 @@
         setView(editingId ? "detail" : "list");
       };
 
-      // Geocode using Nominatim (OpenStreetMap)
+      // Geocode using Nominatim (OpenStreetMap) with result cycling
       const handleGeocode = async () => {
         if (!fn.trim()) { setGeocodeErr("Inserisci prima il nome del locale"); return; }
+
+        const currentQuery = `${fn.trim()}|${fcomune.trim()}`;
+
+        // If query is unchanged and we have more cached results, show the next one
+        if (currentQuery === geocodeQuery && geocodeResults.length > 0) {
+          const nextIndex = geocodeIndex + 1;
+          if (nextIndex < geocodeResults.length) {
+            const r = geocodeResults[nextIndex];
+            setGeocodeIndex(nextIndex);
+            shouldRecenterMap.current = true;
+            setFcoords({ lat: parseFloat(r.lat), lng: parseFloat(r.lon) });
+            const total = geocodeResults.length;
+            if (nextIndex === total - 1) {
+              setGeocodeErr(`Risultato ${nextIndex + 1} di ${total}. Nessun altro risultato disponibile — se non è corretto, tocca sulla mappa per posizionare manualmente.`);
+            } else {
+              setGeocodeErr(`Risultato ${nextIndex + 1} di ${total}. Tocca "Cerca di nuovo" per vedere il prossimo.`);
+            }
+            return;
+          } else {
+            // Already at the end of the list
+            setGeocodeErr("Nessun altro risultato. Tocca sulla mappa per posizionare il pallino manualmente.");
+            return;
+          }
+        }
+
+        // New query: fetch fresh results from Nominatim
         setGeocoding(true);
         setGeocodeErr("");
         try {
-          const query = [fn.trim(), fcomune.trim(), "Italia"].filter(Boolean).join(", ");
-          const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=it&q=${encodeURIComponent(query)}`;
-          const res = await fetch(url, {
-            headers: { "Accept-Language": "it" },
-          });
+          const queryString = [fn.trim(), fcomune.trim(), "Italia"].filter(Boolean).join(", ");
+          const url = `https://nominatim.openstreetmap.org/search?format=json&limit=10&countrycodes=it&q=${encodeURIComponent(queryString)}`;
+          const res = await fetch(url, { headers: { "Accept-Language": "it" } });
           const data = await res.json();
+
           if (data && data.length > 0) {
-            const lat = parseFloat(data[0].lat);
-            const lng = parseFloat(data[0].lon);
+            setGeocodeResults(data);
+            setGeocodeIndex(0);
+            setGeocodeQuery(currentQuery);
+            const r = data[0];
             shouldRecenterMap.current = true;
-            setFcoords({ lat, lng });
+            setFcoords({ lat: parseFloat(r.lat), lng: parseFloat(r.lon) });
+            if (data.length === 1) {
+              setGeocodeErr("");
+            } else {
+              setGeocodeErr(`Risultato 1 di ${data.length}. Tocca "Cerca di nuovo" per vedere il prossimo.`);
+            }
           } else {
-            // Try again with just the comune as fallback
+            // Fallback: try with just the comune
             if (fcomune.trim()) {
               const fallbackUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=it&q=${encodeURIComponent(fcomune.trim() + ", Italia")}`;
               const res2 = await fetch(fallbackUrl, { headers: { "Accept-Language": "it" } });
               const data2 = await res2.json();
               if (data2 && data2.length > 0) {
-                const lat = parseFloat(data2[0].lat);
-                const lng = parseFloat(data2[0].lon);
+                setGeocodeResults(data2);
+                setGeocodeIndex(0);
+                setGeocodeQuery(currentQuery);
+                const r = data2[0];
                 shouldRecenterMap.current = true;
-                setFcoords({ lat, lng });
+                setFcoords({ lat: parseFloat(r.lat), lng: parseFloat(r.lon) });
                 setGeocodeErr("Trovato solo il comune. Tocca sulla mappa per posizionare il pallino.");
               } else {
                 setGeocodeErr("Posizione non trovata. Prova con un nome diverso.");
