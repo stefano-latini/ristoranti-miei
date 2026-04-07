@@ -21,6 +21,8 @@
   <!-- Leaflet for maps (OpenStreetMap-based, no API key required) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <!-- jsPDF for PDF export -->
+  <script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -243,8 +245,8 @@
       "Cucina semplice",
     ];
 
-    // Criteri only shown when tipologia is pranzo_cena
-    const CRITERI_PRANZO_CENA = [
+    // Etichette shown depending on tipologia
+    const ETICHETTE_PRANZO_CENA = [
       { key: "pizza", label: "Pizza" },
       { key: "carne", label: "Carne" },
       { key: "pesce", label: "Pesce" },
@@ -257,6 +259,39 @@
       { key: "elaborata", label: "Cucina elaborata" },
       { key: "semplice", label: "Cucina semplice" },
     ];
+
+    const ETICHETTE_COLAZIONE = [
+      { key: "ottimo_caffe", label: "Ottimo caffè" },
+      { key: "ottime_paste", label: "Ottime paste" },
+      { key: "grande_varieta", label: "Grande varietà" },
+      { key: "molti_posti", label: "Molti posti a sedere" },
+      { key: "posti_aperto", label: "Posti all'aperto" },
+      { key: "parcheggio_facile", label: "Parcheggio facile" },
+      { key: "dolce_salato", label: "Dolce e salato" },
+      { key: "ottimo_cappuccino", label: "Ottimo cappuccino" },
+      { key: "vegano", label: "Vegano" },
+      { key: "senza_glutine", label: "Senza glutine" },
+    ];
+
+    const ETICHETTE_APERITIVO = [
+      { key: "ottimi_cocktail", label: "Ottimi cocktail" },
+      { key: "grande_varieta", label: "Grande varietà" },
+      { key: "molti_posti", label: "Molti posti a sedere" },
+      { key: "posti_aperto", label: "Posti all'aperto" },
+      { key: "parcheggio_facile", label: "Parcheggio facile" },
+      { key: "vegano", label: "Vegano" },
+      { key: "senza_glutine", label: "Senza glutine" },
+    ];
+
+    // Map tipologia key → its label list, for both rendering and search
+    const ETICHETTE_BY_TIPOLOGIA = {
+      pranzo_cena: ETICHETTE_PRANZO_CENA,
+      colazione: ETICHETTE_COLAZIONE,
+      aperitivo: ETICHETTE_APERITIVO,
+    };
+
+    // Backwards-compat alias for old code paths that referenced CRITERI_PRANZO_CENA
+    const CRITERI_PRANZO_CENA = ETICHETTE_PRANZO_CENA;
 
     const STORAGE_KEY = "ristoranti_reviews";
 
@@ -454,7 +489,7 @@
 
         // Convert YYYY-MM-DD to ISO, preserve original time if editing same day
         const dateISO = new Date(fdate + "T12:00:00").toISOString();
-        const criteriToSave = ft === "pranzo_cena" ? fcriteri : [];
+        const criteriToSave = ETICHETTE_BY_TIPOLOGIA[ft] ? fcriteri : [];
         const coordsToSave = fcoords ? { lat: fcoords.lat, lng: fcoords.lng } : { lat: null, lng: null };
 
         if (editingId) {
@@ -563,7 +598,7 @@
         if (detail && detail.id === id) { setDetail(null); setView("list"); }
       };
 
-      // Export
+      // Export JSON
       const handleExport = () => {
         setMenuOpen(false);
         const data = JSON.stringify(reviews, null, 2);
@@ -572,11 +607,181 @@
         const a = document.createElement("a");
         a.href = url;
         const today = new Date().toISOString().split("T")[0];
-        a.download = `locali-${today}.json`;
+        a.download = `localini-${today}.json`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+      };
+
+      // Export CSV
+      const handleExportCSV = () => {
+        setMenuOpen(false);
+        // CSV escape: wrap in quotes and double internal quotes
+        const esc = (v) => {
+          if (v == null) return "";
+          const s = String(v);
+          if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+            return '"' + s.replace(/"/g, '""') + '"';
+          }
+          return s;
+        };
+        const headers = [
+          "Nome", "Comune", "Tipologia", "Data",
+          "Location", "Menu", "Servizio", "Conto", "Media",
+          "Etichette", "Note", "Latitudine", "Longitudine",
+        ];
+        const rows = reviews.map((r) => {
+          const list = ETICHETTE_BY_TIPOLOGIA[r.tipologia] || [];
+          const labels = (r.criteri || [])
+            .map((k) => {
+              const c = list.find((x) => x.key === k);
+              return c ? c.label : k;
+            })
+            .join("; ");
+          const date = r.date ? new Date(r.date).toLocaleDateString("it-IT") : "";
+          const a = avg(r);
+          return [
+            esc(r.name),
+            esc(r.comune || ""),
+            esc(tipLabel(r.tipologia)),
+            esc(date),
+            esc(r.ratings?.location ?? ""),
+            esc(r.ratings?.menu ?? ""),
+            esc(r.ratings?.servizio ?? ""),
+            esc(r.ratings?.conto ?? ""),
+            esc(a.toFixed(1)),
+            esc(labels),
+            esc(r.note || ""),
+            esc(r.lat != null ? r.lat : ""),
+            esc(r.lng != null ? r.lng : ""),
+          ].join(",");
+        });
+        // BOM so Excel opens with correct UTF-8 encoding
+        const csv = "\ufeff" + headers.join(",") + "\n" + rows.join("\n");
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        const today = new Date().toISOString().split("T")[0];
+        a.download = `localini-${today}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      };
+
+      // Export PDF (uses jsPDF loaded from CDN)
+      const handleExportPDF = () => {
+        setMenuOpen(false);
+        if (typeof window.jspdf === "undefined") {
+          alert("Libreria PDF non ancora caricata. Attendi qualche secondo e riprova.");
+          return;
+        }
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ unit: "pt", format: "a4" });
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = 48;
+        let y = margin;
+
+        // Title
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(24);
+        doc.text("Localini", margin, y);
+        y += 22;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        doc.setTextColor(120);
+        doc.text(
+          `${reviews.length} ${reviews.length === 1 ? "recensione" : "recensioni"} • Esportato il ${new Date().toLocaleDateString("it-IT")}`,
+          margin, y
+        );
+        y += 20;
+        doc.setTextColor(0);
+
+        // Sort reviews by avg desc then name
+        const sorted = [...reviews].sort((a, b) => avg(b) - avg(a));
+
+        sorted.forEach((r, idx) => {
+          const a = avg(r);
+          const list = ETICHETTE_BY_TIPOLOGIA[r.tipologia] || [];
+          const labels = (r.criteri || [])
+            .map((k) => {
+              const c = list.find((x) => x.key === k);
+              return c ? c.label : k;
+            })
+            .join(" · ");
+          const date = r.date ? new Date(r.date).toLocaleDateString("it-IT") : "";
+
+          // Estimate block height to handle page breaks
+          const noteLines = r.note ? doc.splitTextToSize(r.note, pageWidth - margin * 2 - 10) : [];
+          const labelLines = labels ? doc.splitTextToSize(labels, pageWidth - margin * 2 - 10) : [];
+          const blockHeight = 60 + noteLines.length * 11 + labelLines.length * 10;
+
+          if (y + blockHeight > pageHeight - margin) {
+            doc.addPage();
+            y = margin;
+          }
+
+          // Separator line above (except first)
+          if (idx > 0) {
+            doc.setDrawColor(220);
+            doc.line(margin, y - 8, pageWidth - margin, y - 8);
+          }
+
+          // Name + score
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(14);
+          doc.setTextColor(20);
+          doc.text(r.name, margin, y);
+          const scoreText = a.toFixed(1);
+          const scoreWidth = doc.getTextWidth(scoreText);
+          doc.text(scoreText, pageWidth - margin - scoreWidth, y);
+          y += 14;
+
+          // Comune + tipologia + date
+          doc.setFont("helvetica", "italic");
+          doc.setFontSize(10);
+          doc.setTextColor(120);
+          const meta = [r.comune, tipLabel(r.tipologia), date].filter(Boolean).join(" · ");
+          doc.text(meta, margin, y);
+          y += 14;
+
+          // Ratings line
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          doc.setTextColor(80);
+          const ratingsText = `Location ${r.ratings?.location ?? "-"}   Menu ${r.ratings?.menu ?? "-"}   Servizio ${r.ratings?.servizio ?? "-"}   Conto ${r.ratings?.conto ?? "-"}`;
+          doc.text(ratingsText, margin, y);
+          y += 12;
+
+          // Etichette
+          if (labelLines.length > 0) {
+            doc.setFontSize(9);
+            doc.setTextColor(100);
+            labelLines.forEach((line) => {
+              doc.text(line, margin, y);
+              y += 11;
+            });
+          }
+
+          // Note
+          if (noteLines.length > 0) {
+            doc.setFont("helvetica", "italic");
+            doc.setFontSize(9);
+            doc.setTextColor(100);
+            noteLines.forEach((line) => {
+              doc.text(line, margin, y);
+              y += 11;
+            });
+          }
+
+          y += 14;
+        });
+
+        const today = new Date().toISOString().split("T")[0];
+        doc.save(`localini-${today}.pdf`);
       };
 
       // Import
@@ -621,10 +826,11 @@
         .filter((r) => {
           if (!search) return true;
           const q = search.toLowerCase();
-          // Resolve criteri keys to their labels for searching
+          // Resolve criteri keys to their labels using the tipologia-specific list
+          const list = ETICHETTE_BY_TIPOLOGIA[r.tipologia] || [];
           const criteriLabels = (r.criteri || [])
             .map((k) => {
-              const c = CRITERI_PRANZO_CENA.find((x) => x.key === k);
+              const c = list.find((x) => x.key === k);
               return c ? c.label.toLowerCase() : "";
             })
             .join(" ");
@@ -1024,7 +1230,49 @@
                                 <line x1="12" y1="15" x2="12" y2="3" />
                               </svg>
                             </span>
-                            Esporta dati
+                            Esporta JSON
+                          </button>
+                          <button
+                            onClick={handleExportCSV}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 10,
+                              width: "100%", textAlign: "left",
+                              padding: "12px 16px", border: "none", background: "transparent",
+                              fontSize: 14, color: "var(--text)", cursor: "pointer",
+                              fontFamily: "'Instrument Sans', sans-serif",
+                              borderBottom: "1px solid var(--border-soft)",
+                              WebkitTapHighlightColor: "transparent",
+                            }}
+                          >
+                            <span style={{ display: "inline-flex", width: 14, height: 14, color: "var(--text-faint)" }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="7 10 12 15 17 10" />
+                                <line x1="12" y1="15" x2="12" y2="3" />
+                              </svg>
+                            </span>
+                            Esporta CSV
+                          </button>
+                          <button
+                            onClick={handleExportPDF}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 10,
+                              width: "100%", textAlign: "left",
+                              padding: "12px 16px", border: "none", background: "transparent",
+                              fontSize: 14, color: "var(--text)", cursor: "pointer",
+                              fontFamily: "'Instrument Sans', sans-serif",
+                              borderBottom: "1px solid var(--border-soft)",
+                              WebkitTapHighlightColor: "transparent",
+                            }}
+                          >
+                            <span style={{ display: "inline-flex", width: 14, height: 14, color: "var(--text-faint)" }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="7 10 12 15 17 10" />
+                                <line x1="12" y1="15" x2="12" y2="3" />
+                              </svg>
+                            </span>
+                            Esporta PDF
                           </button>
                           <button
                             onClick={handleImportClick}
@@ -1044,7 +1292,7 @@
                                 <line x1="12" y1="3" x2="12" y2="15" />
                               </svg>
                             </span>
-                            Importa dati
+                            Importa JSON
                           </button>
                         </div>
                       </>
@@ -1337,11 +1585,11 @@
                 ))}
               </div>
 
-              {ft === "pranzo_cena" && (
+              {ft && ETICHETTE_BY_TIPOLOGIA[ft] && (
                 <>
-                  <label style={{ ...lbl, marginTop: 26 }}>Criteri</label>
+                  <label style={{ ...lbl, marginTop: 26 }}>Etichette</label>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {CRITERI_PRANZO_CENA.map((c) => {
+                    {ETICHETTE_BY_TIPOLOGIA[ft].map((c) => {
                       const selected = fcriteri.includes(c.key);
                       return (
                         <Pill
