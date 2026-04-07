@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#0f0f10" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="I miei locali" />
-  <title>I miei locali</title>
+  <meta name="apple-mobile-web-app-title" content="Localini" />
+  <title>Localini</title>
 
   <!-- Single icon used everywhere: favicon, bookmark, apple touch icon -->
   <link rel="icon" type="image/png" href="icons/favicon.png" />
@@ -141,6 +141,20 @@
     }
     .card-item { transition: background 0.1s; }
     @media (hover: hover) { .card-item:hover { background: var(--surface-alt) !important; } }
+
+    /* Cutlery logo: show the right one based on active theme */
+    .logo-cutlery-cream { display: none; }
+    .logo-cutlery-dark { display: block; }
+    html[data-theme="dark"] .logo-cutlery-cream { display: block; }
+    html[data-theme="dark"] .logo-cutlery-dark { display: none; }
+    @media (prefers-color-scheme: dark) {
+      html[data-theme="auto"] .logo-cutlery-cream { display: block; }
+      html[data-theme="auto"] .logo-cutlery-dark { display: none; }
+    }
+    @media (prefers-color-scheme: light) {
+      html[data-theme="auto"] .logo-cutlery-cream { display: none; }
+      html[data-theme="auto"] .logo-cutlery-dark { display: block; }
+    }
   </style>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -556,8 +570,21 @@
                     <h1 style={{
                       fontFamily: "'Playfair Display', serif",
                       fontSize: 36, fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.1,
+                      display: "flex", alignItems: "center", gap: 10,
                     }}>
-                      I miei locali
+                      <img
+                        src="icons/cutlery-cream.png"
+                        alt=""
+                        className="logo-cutlery-cream"
+                        style={{ height: 34, width: "auto", flexShrink: 0 }}
+                      />
+                      <img
+                        src="icons/cutlery-dark.png"
+                        alt=""
+                        className="logo-cutlery-dark"
+                        style={{ height: 34, width: "auto", flexShrink: 0 }}
+                      />
+                      Localini
                     </h1>
                     <span style={{ fontSize: 12, color: "var(--text-ghost)", fontWeight: 500 }}>
                       {reviews.length} {reviews.length === 1 ? "recensione" : "recensioni"}
