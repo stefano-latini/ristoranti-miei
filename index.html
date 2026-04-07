@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#0f0f10" />
-  <meta name="color-scheme" content="light dark" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="I miei locali" />
@@ -258,6 +257,28 @@
       useEffect(() => {
         document.documentElement.setAttribute("data-theme", theme);
         try { localStorage.setItem("ristoranti_theme", theme); } catch (e) {}
+
+        // Resolve actual color and update theme-color meta tag dynamically
+        // so Safari iOS status bar follows the active theme
+        const resolveColor = () => {
+          let resolved = theme;
+          if (theme === "auto") {
+            resolved = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          }
+          return resolved === "dark" ? "#0f0f10" : "#fafafa";
+        };
+        const updateMeta = () => {
+          const meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute("content", resolveColor());
+        };
+        updateMeta();
+
+        // Listen for system theme changes when in auto mode
+        if (theme === "auto") {
+          const mql = window.matchMedia("(prefers-color-scheme: dark)");
+          mql.addEventListener("change", updateMeta);
+          return () => mql.removeEventListener("change", updateMeta);
+        }
       }, [theme]);
 
       // Form state
