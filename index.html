@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#0f0f10" />
   <meta name="color-scheme" content="light dark" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -99,17 +99,6 @@
     html, body {
       background: var(--bg);
       min-height: 100vh;
-      min-height: 100svh;
-    }
-    /* Full-viewport fixed background that covers all safe areas no matter what.
-       This eliminates the intermittent white strip on Safari iOS. */
-    html::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      background: var(--bg);
-      z-index: -1;
-      transition: background-color 0.25s;
     }
     html { -webkit-text-size-adjust: 100%; }
     body {
@@ -512,7 +501,7 @@
 
           {/* Header */}
           <div style={{
-            padding: "calc(20px + env(safe-area-inset-top)) 20px 14px",
+            padding: "20px 20px 14px",
             background: "var(--bg-translucent)",
             backdropFilter: "blur(12px)",
             WebkitBackdropFilter: "blur(12px)",
