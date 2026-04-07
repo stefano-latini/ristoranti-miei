@@ -96,12 +96,21 @@
         --shadow: 0 8px 32px rgba(0,0,0,0.4);
       }
     }
-    html, body {
+    html {
+      background-color: #0f0f10;
+      -webkit-text-size-adjust: 100%;
+    }
+    html[data-theme="light"] {
+      background-color: #fafafa;
+    }
+    @media (prefers-color-scheme: light) {
+      html[data-theme="auto"] {
+        background-color: #fafafa;
+      }
+    }
+    body {
       background: var(--bg);
       min-height: 100vh;
-    }
-    html { -webkit-text-size-adjust: 100%; }
-    body {
       font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
       color: var(--text);
       -webkit-font-smoothing: antialiased;
