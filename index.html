@@ -370,6 +370,8 @@
       const [fcriteri, setFcriteri] = useState([]);
       const [fcoords, setFcoords] = useState(null); // { lat, lng }
       const [geocoding, setGeocoding] = useState(false);
+      const [geocodeErr, setGeocodeErr] = useState("");
+      const shouldRecenterMap = useRef(false); // true right after a geocode, false after user tap/drag
       const [err, setErr] = useState("");
       const formMapRef = useRef(null);
       const formMarkerRef = useRef(null);
@@ -417,7 +419,7 @@
         setFn(""); setFcomune(""); setFt(null);
         setFr({ location: 0, menu: 0, servizio: 0, conto: 0 });
         setFnote(""); setFdate(todayISO()); setFcriteri([]);
-        setFcoords(null); setGeocoding(false);
+        setFcoords(null); setGeocoding(false); setGeocodeErr("");
         setErr(""); setEditingId(null);
       };
 
@@ -431,6 +433,7 @@
         setFdate(toDateInput(r.date));
         setFcriteri(Array.isArray(r.criteri) ? r.criteri : []);
         setFcoords(r.lat != null && r.lng != null ? { lat: r.lat, lng: r.lng } : null);
+        shouldRecenterMap.current = true;
         setErr("");
         setView("add");
       };
@@ -473,9 +476,9 @@
 
       // Geocode using Nominatim (OpenStreetMap)
       const handleGeocode = async () => {
-        if (!fn.trim()) { setErr("Inserisci prima il nome del locale"); return; }
+        if (!fn.trim()) { setGeocodeErr("Inserisci prima il nome del locale"); return; }
         setGeocoding(true);
-        setErr("");
+        setGeocodeErr("");
         try {
           const query = [fn.trim(), fcomune.trim(), "Italia"].filter(Boolean).join(", ");
           const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=it&q=${encodeURIComponent(query)}`;
@@ -486,6 +489,7 @@
           if (data && data.length > 0) {
             const lat = parseFloat(data[0].lat);
             const lng = parseFloat(data[0].lon);
+            shouldRecenterMap.current = true;
             setFcoords({ lat, lng });
           } else {
             // Try again with just the comune as fallback
@@ -496,17 +500,18 @@
               if (data2 && data2.length > 0) {
                 const lat = parseFloat(data2[0].lat);
                 const lng = parseFloat(data2[0].lon);
+                shouldRecenterMap.current = true;
                 setFcoords({ lat, lng });
-                setErr("Trovato solo il comune. Trascina il pallino per correggere.");
+                setGeocodeErr("Trovato solo il comune. Tocca sulla mappa per posizionare il pallino.");
               } else {
-                setErr("Posizione non trovata. Prova con un nome diverso.");
+                setGeocodeErr("Posizione non trovata. Prova con un nome diverso.");
               }
             } else {
-              setErr("Posizione non trovata. Aggiungi il comune e riprova.");
+              setGeocodeErr("Posizione non trovata. Aggiungi il comune e riprova.");
             }
           }
         } catch (e) {
-          setErr("Errore di rete durante la ricerca.");
+          setGeocodeErr("Errore di rete durante la ricerca.");
         }
         setGeocoding(false);
       };
@@ -595,16 +600,17 @@
         return t ? t.label : "";
       };
 
-      // Build a Leaflet map for the form (mini, draggable marker)
+      // Build a Leaflet map for the form (mini, draggable marker + tap-to-place)
       useEffect(() => {
         if (view !== "add" || !fcoords || !formMapContainerRef.current) return;
         if (typeof L === "undefined") return;
 
         if (!formMapRef.current) {
+          const initialZoom = 14;
           const map = L.map(formMapContainerRef.current, {
             zoomControl: true,
             attributionControl: true,
-          }).setView([fcoords.lat, fcoords.lng], 15);
+          }).setView([fcoords.lat, fcoords.lng], initialZoom);
           L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
             attribution: "© OpenStreetMap",
             maxZoom: 19,
@@ -612,14 +618,26 @@
           const marker = L.marker([fcoords.lat, fcoords.lng], { draggable: true }).addTo(map);
           marker.on("dragend", (e) => {
             const pos = e.target.getLatLng();
+            shouldRecenterMap.current = false;
             setFcoords({ lat: pos.lat, lng: pos.lng });
+          });
+          // Tap/click anywhere on the map to move the marker there
+          map.on("click", (e) => {
+            shouldRecenterMap.current = false;
+            setFcoords({ lat: e.latlng.lat, lng: e.latlng.lng });
           });
           formMapRef.current = map;
           formMarkerRef.current = marker;
+          shouldRecenterMap.current = false;
           setTimeout(() => map.invalidateSize(), 100);
         } else {
-          formMapRef.current.setView([fcoords.lat, fcoords.lng], 15);
+          // Update marker position
           formMarkerRef.current.setLatLng([fcoords.lat, fcoords.lng]);
+          // Recenter only if coords came from geocoding, not from user tap/drag
+          if (shouldRecenterMap.current) {
+            formMapRef.current.setView([fcoords.lat, fcoords.lng], 14);
+            shouldRecenterMap.current = false;
+          }
           setTimeout(() => formMapRef.current.invalidateSize(), 100);
         }
       }, [view, fcoords]);
@@ -1232,9 +1250,18 @@
                     fontSize: 11, color: "var(--text-ghost)",
                     marginTop: 6, textAlign: "center",
                   }}>
-                    Trascina il pallino per correggere la posizione
+                    Tocca sulla mappa o trascina il pallino per correggere la posizione
                   </div>
                 </>
+              )}
+              {geocodeErr && (
+                <div style={{
+                  background: "var(--danger-bg)", border: "1px solid var(--danger-border)", borderRadius: 18,
+                  padding: "10px 18px", marginTop: 10, fontSize: 13, color: "var(--danger)", fontWeight: 500,
+                  lineHeight: 1.4,
+                }}>
+                  {geocodeErr}
+                </div>
               )}
 
               <label style={{ ...lbl, marginTop: 22 }}>Tipologia</label>
