@@ -4,24 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#0f0f10" />
-  <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
-  <meta name="theme-color" content="#0f0f10" media="(prefers-color-scheme: dark)" />
   <meta name="color-scheme" content="light dark" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="I miei locali" />
   <title>I miei locali</title>
 
-  <!-- Favicon (theme-aware) & Apple touch icon: hand-drawn cutlery in red -->
-  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32-light.png" media="(prefers-color-scheme: light)" />
-  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32-dark.png" media="(prefers-color-scheme: dark)" />
-  <link rel="icon" type="image/png" sizes="192x192" href="icons/favicon-192-light.png" media="(prefers-color-scheme: light)" />
-  <link rel="icon" type="image/png" sizes="192x192" href="icons/favicon-192-dark.png" media="(prefers-color-scheme: dark)" />
-  <!-- Fallback for browsers that ignore media queries on icons -->
-  <link rel="shortcut icon" type="image/png" href="icons/favicon-192-dark.png" />
-  <!-- Apple touch icon: red cutlery on dark background, works on any wallpaper -->
-  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png" />
-  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="icons/apple-touch-icon.png" />
+  <!-- Single icon used everywhere: favicon, bookmark, apple touch icon -->
+  <link rel="icon" type="image/png" href="icons/favicon.png" />
+  <link rel="shortcut icon" type="image/png" href="icons/favicon.png" />
+  <link rel="apple-touch-icon" href="icons/icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;0,900;1,400;1,700&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -267,16 +259,6 @@
       // Apply theme: CSS handles the "auto" case via prefers-color-scheme media query
       useEffect(() => {
         document.documentElement.setAttribute("data-theme", theme);
-        // Manual themes need a theme-color meta with no media query to override the declared ones
-        const extra = document.querySelector('meta[name="theme-color"][data-dynamic]');
-        if (extra) extra.remove();
-        if (theme !== "auto") {
-          const meta = document.createElement("meta");
-          meta.setAttribute("name", "theme-color");
-          meta.setAttribute("data-dynamic", "1");
-          meta.setAttribute("content", theme === "dark" ? "#0f0f10" : "#fafafa");
-          document.head.appendChild(meta);
-        }
         try { localStorage.setItem("ristoranti_theme", theme); } catch (e) {}
       }, [theme]);
 
