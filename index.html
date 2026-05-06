@@ -290,6 +290,7 @@
     const CRITERI_PRANZO_CENA = ETICHETTE_PRANZO_CENA;
 
     const STORAGE_KEY = "ristoranti_reviews";
+    const WISHLIST_KEY = "localini_wishlist";
 
     // Pin colors by tipologia — soft pastel palette
     const PIN_COLORS = {
@@ -385,6 +386,7 @@
 
     function App() {
       const [reviews, setReviews] = useState([]);
+      const [wishlist, setWishlist] = useState([]);
       const [view, setView] = useState("list");
       const [detail, setDetail] = useState(null);
       const [filter, setFilter] = useState("pranzo_cena");
@@ -399,6 +401,14 @@
         } catch (e) { return "auto"; }
       });
       const fileInputRef = useRef(null);
+
+      // Wishlist form state
+      const [wfName, setWfName] = useState("");
+      const [wfComune, setWfComune] = useState("");
+      const [wfNote, setWfNote] = useState("");
+      const [wfCoords, setWfCoords] = useState(null);
+      const [wfErr, setWfErr] = useState("");
+      const [editingWishId, setEditingWishId] = useState(null);
 
       // Apply theme: CSS handles the "auto" case via prefers-color-scheme media query
       useEffect(() => {
@@ -461,6 +471,10 @@
           const raw = localStorage.getItem(STORAGE_KEY);
           if (raw) setReviews(JSON.parse(raw));
         } catch (e) {}
+        try {
+          const rawW = localStorage.getItem(WISHLIST_KEY);
+          if (rawW) setWishlist(JSON.parse(rawW));
+        } catch (e) {}
         setLoaded(true);
       }, []);
 
@@ -468,6 +482,60 @@
         setReviews(data);
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) {}
       }, []);
+
+      const saveWishlist = useCallback((data) => {
+        setWishlist(data);
+        try { localStorage.setItem(WISHLIST_KEY, JSON.stringify(data)); } catch (e) {}
+      }, []);
+
+      const resetWishForm = () => {
+        setWfName(""); setWfComune(""); setWfNote(""); setWfCoords(null); setWfErr(""); setEditingWishId(null);
+      };
+
+      const submitWish = () => {
+        if (!wfName.trim()) return setWfErr("Inserisci il nome del locale");
+        const coordsToSave = wfCoords ? { lat: wfCoords.lat, lng: wfCoords.lng } : { lat: null, lng: null };
+        if (editingWishId) {
+          const updated = wishlist.map((w) => w.id === editingWishId
+            ? { ...w, name: wfName.trim(), comune: wfComune.trim(), note: wfNote.trim(), ...coordsToSave }
+            : w);
+          saveWishlist(updated);
+        } else {
+          const item = {
+            id: Date.now().toString(),
+            name: wfName.trim(),
+            comune: wfComune.trim(),
+            note: wfNote.trim(),
+            date: new Date().toISOString(),
+            ...coordsToSave,
+          };
+          saveWishlist([item, ...wishlist]);
+        }
+        resetWishForm();
+        setView("wishlist");
+      };
+
+      const delWish = (id) => {
+        saveWishlist(wishlist.filter((w) => w.id !== id));
+        setView("wishlist");
+      };
+
+      // Promote a wishlist item to a real review (opens the add form pre-filled)
+      const promoteWish = (w) => {
+        reset();
+        setFn(w.name);
+        setFcomune(w.comune || "");
+        if (w.lat != null && w.lng != null) {
+          setFcoords({ lat: w.lat, lng: w.lng });
+        }
+        setFnote(w.note || "");
+        setView("add");
+        // After saving the review, we should remove from wishlist
+        // Store the wish id so submit can clean it up
+        setEditingId(null);
+        // We'll store a ref to delete after submit
+        window.__promoteWishId = w.id;
+      };
 
       const avg = (r) => {
         const v = CATEGORIES.map((c) => r.ratings[c.key]);
@@ -546,6 +614,11 @@
           save([item, ...reviews]);
         }
         reset();
+        // If this was a promotion from wishlist, remove the wish item
+        if (window.__promoteWishId) {
+          saveWishlist(wishlist.filter((w) => w.id !== window.__promoteWishId));
+          window.__promoteWishId = null;
+        }
         setView(editingId ? "detail" : "list");
       };
 
@@ -1265,7 +1338,22 @@
                       {reviews.length} {reviews.length === 1 ? "recensione" : "recensioni"}
                     </span>
                   </div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", position: "relative" }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    {/* Wishlist (Da provare) button */}
+                    <button
+                      onClick={() => setView("wishlist")}
+                      style={{
+                        width: 40, height: 40, borderRadius: 99,
+                        border: "1.5px solid var(--border-strong)", background: "var(--surface)", color: "var(--text)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        cursor: "pointer", WebkitTapHighlightColor: "transparent",
+                      }}
+                      aria-label="Da provare"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                      </svg>
+                    </button>
                     {/* Map button */}
                     <button
                       onClick={() => setView("map")}
@@ -1282,19 +1370,6 @@
                         <circle cx="12" cy="9" r="2.5"/>
                       </svg>
                     </button>
-                    {/* Menu button */}
-                    <button
-                      onClick={() => setMenuOpen(!menuOpen)}
-                      style={{
-                        width: 40, height: 40, borderRadius: 99,
-                        border: "1.5px solid var(--border-strong)", background: "var(--surface)", color: "var(--text)",
-                        fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center",
-                        cursor: "pointer", WebkitTapHighlightColor: "transparent",
-                      }}
-                      aria-label="Menu"
-                    >
-                      ⋯
-                    </button>
                     {/* Add button */}
                     <button
                       onClick={() => { reset(); setView("add"); }}
@@ -1308,188 +1383,17 @@
                     >
                       +
                     </button>
-                    {/* Dropdown menu */}
-                    {menuOpen && (
-                      <>
-                        <div
-                          onClick={() => setMenuOpen(false)}
-                          style={{
-                            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-                            zIndex: 20,
-                          }}
-                        />
-                        <div style={{
-                          position: "absolute", top: 48, right: 0,
-                          background: "var(--surface)", borderRadius: 14,
-                          border: "1px solid var(--border)",
-                          boxShadow: "var(--shadow)",
-                          minWidth: 220, overflow: "hidden",
-                          zIndex: 30,
-                        }}>
-                          {/* Theme segmented control */}
-                          <div style={{
-                            padding: "12px 12px 10px",
-                            borderBottom: "1px solid var(--border-soft)",
-                          }}>
-                            <div style={{
-                              display: "flex",
-                              background: "var(--pill-bg)",
-                              borderRadius: 99,
-                              padding: 3,
-                              gap: 2,
-                            }}>
-                              {[
-                                {
-                                  key: "auto",
-                                  label: "Auto",
-                                  icon: null,
-                                },
-                                {
-                                  key: "light",
-                                  label: null,
-                                  icon: (
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                      <circle cx="12" cy="12" r="4" />
-                                      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-                                    </svg>
-                                  ),
-                                },
-                                {
-                                  key: "dark",
-                                  label: null,
-                                  icon: (
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                      <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
-                                    </svg>
-                                  ),
-                                },
-                              ].map((opt) => {
-                                const active = theme === opt.key;
-                                return (
-                                  <button
-                                    key={opt.key}
-                                    onClick={() => setTheme(opt.key)}
-                                    style={{
-                                      flex: 1,
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      gap: 6,
-                                      padding: "8px 10px",
-                                      border: "none",
-                                      borderRadius: 99,
-                                      background: active ? "var(--surface)" : "transparent",
-                                      color: active ? "var(--text)" : "var(--text-faint)",
-                                      fontSize: 13,
-                                      fontWeight: 600,
-                                      cursor: "pointer",
-                                      fontFamily: "'Instrument Sans', sans-serif",
-                                      boxShadow: active ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
-                                      transition: "all 0.15s",
-                                      WebkitTapHighlightColor: "transparent",
-                                    }}
-                                  >
-                                    {opt.icon}
-                                    {opt.label}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                          <button
-                            onClick={handleExport}
-                            style={{
-                              display: "flex", alignItems: "center", gap: 10,
-                              width: "100%", textAlign: "left",
-                              padding: "12px 16px", border: "none", background: "transparent",
-                              fontSize: 14, color: "var(--text)", cursor: "pointer",
-                              fontFamily: "'Instrument Sans', sans-serif",
-                              borderBottom: "1px solid var(--border-soft)",
-                              WebkitTapHighlightColor: "transparent",
-                            }}
-                          >
-                            <span style={{ display: "inline-flex", width: 14, height: 14, color: "var(--text-faint)" }}>
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                <polyline points="7 10 12 15 17 10" />
-                                <line x1="12" y1="15" x2="12" y2="3" />
-                              </svg>
-                            </span>
-                            Esporta JSON
-                          </button>
-                          <button
-                            onClick={handleExportCSV}
-                            style={{
-                              display: "flex", alignItems: "center", gap: 10,
-                              width: "100%", textAlign: "left",
-                              padding: "12px 16px", border: "none", background: "transparent",
-                              fontSize: 14, color: "var(--text)", cursor: "pointer",
-                              fontFamily: "'Instrument Sans', sans-serif",
-                              borderBottom: "1px solid var(--border-soft)",
-                              WebkitTapHighlightColor: "transparent",
-                            }}
-                          >
-                            <span style={{ display: "inline-flex", width: 14, height: 14, color: "var(--text-faint)" }}>
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                <polyline points="7 10 12 15 17 10" />
-                                <line x1="12" y1="15" x2="12" y2="3" />
-                              </svg>
-                            </span>
-                            Esporta CSV
-                          </button>
-                          <button
-                            onClick={handleExportPDF}
-                            style={{
-                              display: "flex", alignItems: "center", gap: 10,
-                              width: "100%", textAlign: "left",
-                              padding: "12px 16px", border: "none", background: "transparent",
-                              fontSize: 14, color: "var(--text)", cursor: "pointer",
-                              fontFamily: "'Instrument Sans', sans-serif",
-                              borderBottom: "1px solid var(--border-soft)",
-                              WebkitTapHighlightColor: "transparent",
-                            }}
-                          >
-                            <span style={{ display: "inline-flex", width: 14, height: 14, color: "var(--text-faint)" }}>
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                <polyline points="7 10 12 15 17 10" />
-                                <line x1="12" y1="15" x2="12" y2="3" />
-                              </svg>
-                            </span>
-                            Esporta PDF
-                          </button>
-                          <button
-                            onClick={handleImportClick}
-                            style={{
-                              display: "flex", alignItems: "center", gap: 10,
-                              width: "100%", textAlign: "left",
-                              padding: "12px 16px", border: "none", background: "transparent",
-                              fontSize: 14, color: "var(--text)", cursor: "pointer",
-                              fontFamily: "'Instrument Sans', sans-serif",
-                              WebkitTapHighlightColor: "transparent",
-                            }}
-                          >
-                            <span style={{ display: "inline-flex", width: 14, height: 14, color: "var(--text-faint)" }}>
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                <polyline points="17 8 12 3 7 8" />
-                                <line x1="12" y1="3" x2="12" y2="15" />
-                              </svg>
-                            </span>
-                            Importa JSON
-                          </button>
-                        </div>
-                      </>
-                    )}
                   </div>
                 </>
               ) : (
                 <>
                   <button
                     onClick={() => {
-                      if (view === "map") {
+                      if (view === "map" || view === "wishlist") {
                         setView("list");
+                      } else if (view === "wish_add") {
+                        resetWishForm();
+                        setView("wishlist");
                       } else if (view === "add" && editingId) {
                         setView("detail");
                         reset();
@@ -1507,7 +1411,7 @@
                     ← Indietro
                   </button>
                   <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 800 }}>
-                    {view === "add" ? (editingId ? "Modifica" : "Nuova recensione") : view === "map" ? "Mappa" : "Dettaglio"}
+                    {view === "add" ? (editingId ? "Modifica" : "Nuova recensione") : view === "map" ? "Mappa" : view === "wishlist" ? "Da provare" : view === "wish_add" ? (editingWishId ? "Modifica" : "Nuovo suggerimento") : "Dettaglio"}
                   </span>
                   <div style={{ width: 70 }} />
                 </>
@@ -1518,20 +1422,118 @@
           {/* LIST */}
           {view === "list" && (
             <div style={{ padding: "14px 20px 40px" }}>
-              <input
-                type="text"
-                placeholder="Cerca…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                style={{
-                  width: "100%", padding: "11px 20px", borderRadius: 99,
-                  border: "1.5px solid var(--border-strong)", background: "var(--surface)",
-                  fontSize: 15, color: "var(--text)", outline: "none",
-                  marginBottom: 12, transition: "border-color 0.15s",
-                }}
-                onFocus={(e) => e.target.style.borderColor = "var(--accent)"}
-                onBlur={(e) => e.target.style.borderColor = "var(--border-strong)"}
-              />
+              <div style={{ display: "flex", gap: 8, marginBottom: 12, position: "relative" }}>
+                <input
+                  type="text"
+                  placeholder="Cerca…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  style={{
+                    flex: 1, padding: "11px 20px", borderRadius: 99,
+                    border: "1.5px solid var(--border-strong)", background: "var(--surface)",
+                    fontSize: 15, color: "var(--text)", outline: "none",
+                    transition: "border-color 0.15s", minWidth: 0,
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = "var(--accent)"}
+                  onBlur={(e) => e.target.style.borderColor = "var(--border-strong)"}
+                />
+                {/* Menu button (moved from header) */}
+                <button
+                  onClick={() => setMenuOpen(!menuOpen)}
+                  style={{
+                    width: 44, height: 44, borderRadius: 99, flexShrink: 0,
+                    border: "1.5px solid var(--border-strong)", background: "var(--surface)", color: "var(--text)",
+                    fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center",
+                    cursor: "pointer", WebkitTapHighlightColor: "transparent",
+                  }}
+                  aria-label="Menu"
+                >
+                  ⋯
+                </button>
+                {/* Dropdown menu */}
+                {menuOpen && (
+                  <>
+                    <div
+                      onClick={() => setMenuOpen(false)}
+                      style={{
+                        position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+                        zIndex: 20,
+                      }}
+                    />
+                    <div style={{
+                      position: "absolute", top: 52, right: 0,
+                      background: "var(--surface)", borderRadius: 14,
+                      border: "1px solid var(--border)",
+                      boxShadow: "var(--shadow)",
+                      minWidth: 220, overflow: "hidden",
+                      zIndex: 30,
+                    }}>
+                      {/* Theme segmented control */}
+                      <div style={{
+                        padding: "12px 12px 10px",
+                        borderBottom: "1px solid var(--border-soft)",
+                      }}>
+                        <div style={{
+                          display: "flex",
+                          background: "var(--pill-bg)",
+                          borderRadius: 99,
+                          padding: 3,
+                          gap: 2,
+                        }}>
+                          {[
+                            { key: "auto", label: "Auto", icon: null },
+                            { key: "light", label: null, icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" /></svg>) },
+                            { key: "dark", label: null, icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></svg>) },
+                          ].map((opt) => {
+                            const active = theme === opt.key;
+                            return (
+                              <button key={opt.key} onClick={() => setTheme(opt.key)} style={{
+                                flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                                padding: "8px 10px", border: "none", borderRadius: 99,
+                                background: active ? "var(--surface)" : "transparent",
+                                color: active ? "var(--text)" : "var(--text-faint)",
+                                fontSize: 13, fontWeight: 600, cursor: "pointer",
+                                fontFamily: "'Instrument Sans', sans-serif",
+                                boxShadow: active ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                                WebkitTapHighlightColor: "transparent",
+                              }}>
+                                {opt.icon}{opt.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      {[
+                        { label: "Esporta JSON", handler: handleExport, icon: "down" },
+                        { label: "Esporta CSV", handler: handleExportCSV, icon: "down" },
+                        { label: "Esporta PDF", handler: handleExportPDF, icon: "down" },
+                        { label: "Importa JSON", handler: handleImportClick, icon: "up", last: true },
+                      ].map((item, idx) => (
+                        <button key={idx} onClick={item.handler} style={{
+                          display: "flex", alignItems: "center", gap: 10,
+                          width: "100%", textAlign: "left",
+                          padding: "12px 16px", border: "none", background: "transparent",
+                          fontSize: 14, color: "var(--text)", cursor: "pointer",
+                          fontFamily: "'Instrument Sans', sans-serif",
+                          borderBottom: item.last ? "none" : "1px solid var(--border-soft)",
+                          WebkitTapHighlightColor: "transparent",
+                        }}>
+                          <span style={{ display: "inline-flex", width: 14, height: 14, color: "var(--text-faint)" }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                              {item.icon === "down"
+                                ? <><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></>
+                                : <><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></>
+                              }
+                            </svg>
+                          </span>
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
 
               <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2, marginBottom: 10, WebkitOverflowScrolling: "touch" }}>
                 {TIPOLOGIE.map((t) => (
@@ -1653,6 +1655,186 @@
               </div>
             );
           })()}
+
+          {/* WISHLIST - Da provare */}
+          {view === "wishlist" && (
+            <div style={{ padding: "14px 20px 40px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <span style={{ fontSize: 12, color: "var(--text-ghost)", fontWeight: 500 }}>
+                  {wishlist.length} {wishlist.length === 1 ? "locale" : "locali"} da provare
+                </span>
+                <button
+                  onClick={() => { resetWishForm(); setView("wish_add"); }}
+                  style={{
+                    padding: "8px 16px", borderRadius: 99,
+                    border: "none", background: "var(--accent)", color: "var(--accent-inverse)",
+                    fontSize: 13, fontWeight: 600, cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: 6,
+                    WebkitTapHighlightColor: "transparent",
+                  }}
+                >
+                  + Aggiungi
+                </button>
+              </div>
+              {wishlist.length === 0 ? (
+                <div style={{
+                  textAlign: "center", padding: "60px 20px",
+                  color: "var(--text-faint)", fontSize: 14, lineHeight: 1.6,
+                }}>
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 12, opacity: 0.3 }}>
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                  </svg>
+                  <br />
+                  Nessun locale salvato.<br />
+                  Aggiungi i posti che vuoi provare!
+                </div>
+              ) : (
+                <div style={{
+                  background: "var(--surface)", borderRadius: 22,
+                  border: "1px solid var(--border)",
+                  overflow: "hidden",
+                }}>
+                  {wishlist.map((w, idx) => (
+                    <div
+                      key={w.id}
+                      className="card-item"
+                      style={{
+                        padding: "14px 18px",
+                        borderBottom: idx < wishlist.length - 1 ? "1px solid var(--border-ghost)" : "none",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontFamily: "'Playfair Display', serif",
+                            fontSize: 18, fontWeight: 800,
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          }}>
+                            {w.name}
+                          </div>
+                          {w.comune && (
+                            <div style={{
+                              fontFamily: "'Playfair Display', serif",
+                              fontSize: 12, fontStyle: "italic",
+                              color: "var(--text-ghost)", marginTop: 2,
+                            }}>
+                              {w.comune}
+                            </div>
+                          )}
+                          {w.note && (
+                            <div style={{
+                              fontSize: 12, color: "var(--text-faint)", marginTop: 4,
+                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                            }}>
+                              {w.note}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexShrink: 0, marginLeft: 12 }}>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); promoteWish(w); }}
+                            title="Recensisci"
+                            style={{
+                              width: 32, height: 32, borderRadius: 99,
+                              border: "1px solid var(--border)", background: "var(--surface)",
+                              color: "var(--text-faint)", fontSize: 14,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              cursor: "pointer", WebkitTapHighlightColor: "transparent",
+                            }}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                            </svg>
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); if (confirm("Rimuovere questo suggerimento?")) delWish(w.id); }}
+                            title="Elimina"
+                            style={{
+                              width: 32, height: 32, borderRadius: 99,
+                              border: "1px solid var(--border)", background: "var(--surface)",
+                              color: "var(--danger)", fontSize: 14,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              cursor: "pointer", WebkitTapHighlightColor: "transparent",
+                            }}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14H7L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* WISH_ADD - Add/edit a wishlist item */}
+          {view === "wish_add" && (
+            <div style={{ padding: "24px 20px 40px" }}>
+              <label style={lbl}>Nome del locale</label>
+              <input
+                type="text"
+                placeholder="es. Trattoria da Mario"
+                value={wfName}
+                onChange={(e) => setWfName(e.target.value)}
+                style={inp}
+                onFocus={(e) => e.target.style.borderColor = "var(--accent)"}
+                onBlur={(e) => e.target.style.borderColor = "var(--border-strong)"}
+              />
+
+              <label style={{ ...lbl, marginTop: 18 }}>Comune</label>
+              <input
+                type="text"
+                placeholder="es. Milano"
+                value={wfComune}
+                onChange={(e) => setWfComune(e.target.value)}
+                style={inp}
+                onFocus={(e) => e.target.style.borderColor = "var(--accent)"}
+                onBlur={(e) => e.target.style.borderColor = "var(--border-strong)"}
+              />
+
+              <label style={{ ...lbl, marginTop: 18 }}>Note</label>
+              <textarea
+                placeholder="Chi te l'ha consigliato, perché…"
+                value={wfNote}
+                onChange={(e) => setWfNote(e.target.value)}
+                rows={3}
+                style={{
+                  ...inp,
+                  borderRadius: 18,
+                  resize: "vertical",
+                  minHeight: 80,
+                }}
+                onFocus={(e) => e.target.style.borderColor = "var(--accent)"}
+                onBlur={(e) => e.target.style.borderColor = "var(--border-strong)"}
+              />
+
+              {wfErr && (
+                <div style={{
+                  background: "var(--danger-bg)", border: "1px solid var(--danger-border)", borderRadius: 18,
+                  padding: "10px 18px", marginTop: 14, fontSize: 13, color: "var(--danger)", fontWeight: 500,
+                }}>
+                  {wfErr}
+                </div>
+              )}
+
+              <button
+                onClick={submitWish}
+                style={{
+                  width: "100%", marginTop: 24, padding: "14px",
+                  borderRadius: 99, border: "none",
+                  background: "var(--accent)", color: "var(--accent-inverse)",
+                  fontSize: 15, fontWeight: 700, cursor: "pointer",
+                  WebkitTapHighlightColor: "transparent",
+                }}
+              >
+                {editingWishId ? "Salva modifiche" : "Aggiungi alla lista"}
+              </button>
+            </div>
+          )}
 
           {/* ADD / EDIT */}
           {view === "add" && (
